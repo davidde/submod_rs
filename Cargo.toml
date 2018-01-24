@@ -1,0 +1,6 @@
+[package]
+name = "submod"
+version = "0.1.0"
+authors = ["DavidDeprost <dadeprost@gmail.com>"]
+
+[dependencies]
