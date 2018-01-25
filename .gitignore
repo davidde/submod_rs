@@ -1,3 +1,5 @@
 
+*.srt
+*.vtt
 /target/
 **/*.rs.bk
