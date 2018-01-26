@@ -5,4 +5,4 @@ authors = ["DavidDeprost <dadeprost@gmail.com>"]
 
 [dependencies]
 regex = "0.2"
-
+clap = "~2.29"
