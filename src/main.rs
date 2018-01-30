@@ -84,7 +84,7 @@ fn convert_srt(input: &str, seconds: f64) {
             
         }
     }
-    let test = process_time("00:10:12.512", seconds);
+    let test = process_line("00:10:12.512 --> 00:10:15.758", seconds);
     println!("Processed test: {}", test);
 
 }
@@ -98,9 +98,25 @@ USAGE:
 ");
 }
 
-// fn process_line(line: &str, seconds: f64) -> String {
+fn process_line(line: &str, seconds: f64) -> String {
+    let start = &line[0..12];
+    let start = process_time(start, seconds);
 
-// }
+    let end = &line[17..29];
+    let end = process_time(end, seconds);
+
+    let line = if start == "(DELETED)\n" {
+        if end == "(DELETED)\n" {
+            String::from("(DELETED)\n")
+        } else {
+            format!("00:00:00.000 --> {}", end)
+        }
+    } else {
+        format!("{} --> {}", start, end)
+    };
+
+    return line;
+}
 
 fn process_time(time: &str, incr: f64) -> String {
     let mut hours: f64 = time[0..2].parse()
