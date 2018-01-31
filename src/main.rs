@@ -58,7 +58,7 @@ fn main() {
     let to_srt: bool = matches.is_present("srt");
 
     if inputfile.ends_with(".srt") {
-        convert_srt(inputfile, seconds)
+        convert_srt(inputfile, seconds, to_vtt)
     }
 
     println!("Change file {} with {} seconds", inputfile, seconds);
@@ -67,22 +67,56 @@ fn main() {
     }
 }
 
-fn convert_srt(input: &str, seconds: f64) {
+fn convert_srt(input: &str, seconds: f64, to_vtt: bool) {
     let f = File::open(input).expect("File not found.");
     let reader = BufReader::new(f);
 
+    let mut out = File::create("out.srt")
+        .expect("error creating outputfile");
+
     let re = Regex::new(r"\d{2}:\d{2}:\d{2},\d{3}")
         .expect("Error compiling regex.");
+
+    let mut skip: bool = false;
+    let mut deleted_subs = 0;
 
     for line in reader.lines() {
         let old_line = line.expect("Error reading line.");
         let timeline: bool = re.is_match(&old_line);
 
-        if timeline {
-            let _new_line = old_line.replace(",", ".");
-            //let new_line = process_line(&new_line, seconds);
-            
-        }
+        let new_line = if timeline {
+            let mut new_line = old_line.replace(",", ".");
+            new_line = process_line(&new_line, seconds);
+            if new_line == "(DELETED)\n" {
+                deleted_subs += 1;
+                skip = true;
+                new_line
+            } else if to_vtt {
+                new_line
+            } else {
+                // Convert back to '.srt' style:
+                new_line.replace(".", ",")
+            }
+        } else {
+            // When skip = True, subtitles are shifted too far back
+            // into the past (before the start of the movie),
+            // so they are deleted:
+            if skip {
+                // Subtitles can be 1 or 2 lines; we should only update
+                // skip when we have arrived at an empty line:
+                if old_line == "" {
+                    skip = false;
+                }
+                continue;
+            } else {
+                old_line
+            }
+        };
+
+        // Add \n to the lines before writing them:
+        let new_line = format!("{}\n", new_line);
+        out.write(new_line.as_bytes())
+            .expect("error writing to outputfile");
     }
     let test = process_line("00:10:12.512 --> 00:10:15.758", seconds);
     println!("Processed test: {}", test);
@@ -99,6 +133,7 @@ USAGE:
 }
 
 fn process_line(line: &str, seconds: f64) -> String {
+    // '&' is necessary here!?
     let start = &line[0..12];
     let start = process_time(start, seconds);
 
@@ -119,6 +154,7 @@ fn process_line(line: &str, seconds: f64) -> String {
 }
 
 fn process_time(time: &str, incr: f64) -> String {
+    // '&' is not allowed here!?
     let mut hours: f64 = time[0..2].parse()
         .expect("error: invalid hour field in timeline");
     hours *= 3600.0;
