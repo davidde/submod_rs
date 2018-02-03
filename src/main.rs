@@ -34,10 +34,6 @@ fn main() {
 
     // Calling .unwrap() is safe here because "INPUTFILE" and "SECONDS" are required.
     // If they weren't required we could use an 'if let' to conditionally get the value,
-    // like so:
-    // if let Some(s) = matches.value_of("SECONDS") {
-    //     println!("Value for SECONDS: {}", s);
-    // }
     let inputfile = matches.value_of("INPUTFILE").unwrap();
     let seconds = matches.value_of("SECONDS").unwrap();
     let seconds: f64 = match seconds.parse() {
@@ -57,16 +53,20 @@ fn main() {
     let to_vtt: bool = matches.is_present("vtt");
     let to_srt: bool = matches.is_present("srt");
 
-    if inputfile.ends_with(".srt") {
-        let name = name_output(inputfile, seconds, to_vtt);
-        println!("{}", name);
-        convert_srt(inputfile, seconds, to_vtt);
-    }
+    let (deleted_subs, outputfile) = if inputfile.ends_with(".srt") {
+        let outputfile = name_output(inputfile, seconds, to_vtt);
+        let deleted_subs = convert_srt(inputfile, &outputfile, seconds, to_vtt);
+        (deleted_subs, outputfile)
+    } else if inputfile.ends_with(".vtt") {
+        let outputfile = name_output(inputfile, seconds, to_srt);
+        let deleted_subs = convert_srt(inputfile, &outputfile, seconds, to_srt);
+        (deleted_subs, outputfile)
+    } else {
+        help();
+        panic!("Specify either an .srt or .vtt file as input.");
+    };
 
-    println!("Change file {} with {} seconds", inputfile, seconds);
-    if to_vtt {
-        println!("Converting the file to .vtt!");
-    }
+    status(deleted_subs, &outputfile);
 }
 
 fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
@@ -104,16 +104,24 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
 
     // we can't use format! because it requires a string literal as first arg;
     // so format!(output, incr) won't compile.
-    let outputfile = output.replace("{abc.xy}", &incr.to_string());
+    output = output.replace("{abc.xy}", &incr.to_string());
 
-    return outputfile;
+    if change_ext {
+        if output.ends_with(".srt") {
+            output = output.replace(".srt", ".vtt");
+        } else if output.ends_with(".vtt") {
+            output = output.replace(".vtt", ".srt");
+        }
+    }
+
+    return output;
 }
 
-fn convert_srt(input: &str, seconds: f64, to_vtt: bool) {
+fn convert_srt(input: &str, output: &str, seconds: f64, to_vtt: bool) -> i32 {
     let f = File::open(input).expect("File not found.");
     let reader = BufReader::new(f);
 
-    let mut out = File::create("out.srt")
+    let mut out = File::create(output)
         .expect("error creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2},\d{3}")
@@ -159,8 +167,8 @@ fn convert_srt(input: &str, seconds: f64, to_vtt: bool) {
         out.write((new_line + "\n").as_bytes())
             .expect("error writing to outputfile");
     }
-    let test = process_line("00:10:12.512 --> 00:10:15.758", seconds);
-    println!("Processed test: {}", test);
+
+    return deleted_subs;
 
 }
 
@@ -222,4 +230,21 @@ fn process_time(time: &str, incr: f64) -> String {
     };
 
     return time_string;
+}
+
+fn status(deleted_subs: i32, outputfile: &str) {
+    let mut text: String = "".to_string();
+    if deleted_subs > 0 {
+        if deleted_subs == 1 {
+            text += "Success.\nOne subtitle was deleted at the beginning of the file.";
+        } else {
+            text = format!("Success.\n{} subtitles were deleted at the beginning of the file.",
+                deleted_subs);
+        }
+    } else {
+        text = "Success.".to_string();
+    }
+
+    println!("{}", text);
+    println!("Filename = {}", outputfile);
 }
