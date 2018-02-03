@@ -58,13 +58,55 @@ fn main() {
     let to_srt: bool = matches.is_present("srt");
 
     if inputfile.ends_with(".srt") {
-        convert_srt(inputfile, seconds, to_vtt)
+        let name = name_output(inputfile, seconds, to_vtt);
+        println!("{}", name);
+        convert_srt(inputfile, seconds, to_vtt);
     }
 
     println!("Change file {} with {} seconds", inputfile, seconds);
     if to_vtt {
         println!("Converting the file to .vtt!");
     }
+}
+
+fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
+    // Regex to check if the inputfile was previously processed by submod:
+    let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
+        .expect("Error compiling regex.");
+
+    let processed: bool = pat.is_match(input);
+    let mut incr: f64 = 0.0;
+    let mut output: String = "".to_string();
+
+    if processed {
+        // Regex for extracting the increment number from the inputfile:
+        let num = Regex::new(r"[+-]\d+\.\d+")
+            .expect("Error compiling regex.");
+
+        let capture = num.captures(input)
+            .expect("No number found in filename");
+        incr = capture.get(0)
+            .unwrap().as_str()
+            .parse().expect("error converting number to float");
+
+        incr += seconds;
+
+        let index = pat.find(input).unwrap();
+        output = "{{abc.xy}_Sec}_".to_string() + &input[index.end()..];
+    } else {
+        incr = seconds;
+        output = "{{abc.xy}_Sec}_".to_string() + input;
+    }
+
+    if incr >= 0.0 {
+        output = "{+".to_string() + &output[1..];
+    }
+
+    // we can't use format! because it requires a string literal as first arg;
+    // so format!(output, incr) won't compile.
+    let outputfile = output.replace("{abc.xy}", &incr.to_string());
+
+    return outputfile;
 }
 
 fn convert_srt(input: &str, seconds: f64, to_vtt: bool) {
@@ -114,8 +156,7 @@ fn convert_srt(input: &str, seconds: f64, to_vtt: bool) {
         };
 
         // Add \n to the lines before writing them:
-        let new_line = format!("{}\n", new_line);
-        out.write(new_line.as_bytes())
+        out.write((new_line + "\n").as_bytes())
             .expect("error writing to outputfile");
     }
     let test = process_line("00:10:12.512 --> 00:10:15.758", seconds);
@@ -163,7 +204,7 @@ fn process_time(time: &str, incr: f64) -> String {
         .expect("error: invalid minutes field in timeline");
     mins *= 60.0;
 
-    let secs: f64 =  time[6..12].parse()
+    let secs: f64 = time[6..12].parse()
         .expect("error: invalid seconds field in timeline");
 
     // incr can be negative, so the new time could be too:
