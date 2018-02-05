@@ -59,7 +59,7 @@ fn main() {
         (deleted_subs, outputfile)
     } else if inputfile.ends_with(".vtt") {
         let outputfile = name_output(inputfile, seconds, to_srt);
-        let deleted_subs = convert_srt(inputfile, &outputfile, seconds, to_srt);
+        let deleted_subs = convert_vtt(inputfile, &outputfile, seconds, to_srt);
         (deleted_subs, outputfile)
     } else {
         help();
@@ -69,18 +69,27 @@ fn main() {
     status(deleted_subs, &outputfile);
 }
 
+fn help() {
+    println!("
+USAGE:
+    submod <INPUTFILE> <SECONDS>
+        INPUTFILE: .srt or .vtt subtitle file
+        SECONDS: seconds to add or subtract from time encoding
+");
+}
+
 fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
     // Regex to check if the inputfile was previously processed by submod:
-    let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
+    let pat = Regex::new(r"\{[+-]\d+[\.\d+]_Sec\}_")
         .expect("Error compiling regex.");
 
     let processed: bool = pat.is_match(input);
     let mut incr: f64 = 0.0;
-    let mut output: String = "".to_string();
+    let mut output = String::new();
 
     if processed {
         // Regex for extracting the increment number from the inputfile:
-        let num = Regex::new(r"[+-]\d+\.\d+")
+        let num = Regex::new(r"[+-]\d+[\.\d+]")
             .expect("Error compiling regex.");
 
         let capture = num.captures(input)
@@ -172,13 +181,58 @@ fn convert_srt(input: &str, output: &str, seconds: f64, to_vtt: bool) -> i32 {
 
 }
 
-fn help() {
-    println!("
-USAGE:
-    submod <INPUTFILE> <SECONDS>
-        INPUTFILE: .srt or .vtt subtitle file
-        SECONDS: seconds to add or subtract from time encoding
-");
+fn convert_vtt(input: &str, output: &str, seconds: f64, to_srt: bool) -> i32 {
+    let f = File::open(input).expect("File not found.");
+    let reader = BufReader::new(f);
+
+    let mut out = File::create(output)
+        .expect("error creating outputfile");
+
+    let re = Regex::new(r"\d{2}:\d{2}:\d{2}\.\d{3}")
+        .expect("Error compiling regex.");
+
+    let mut skip: bool = false;
+    let mut deleted_subs = 0;
+
+    for line in reader.lines() {
+        let old_line = line.expect("Error reading line.");
+        let timeline: bool = re.is_match(&old_line);
+
+        let new_line = if timeline {
+            let new_line = process_line(&old_line, seconds);
+            if new_line == "(DELETED)\n" {
+                deleted_subs += 1;
+                skip = true;
+                new_line
+            } else if to_srt {
+                // Convert back to '.srt' style:
+                new_line.replace(".", ",")
+            } else {
+                new_line
+            }
+        } else {
+            // When skip = True, subtitles are shifted too far back
+            // into the past (before the start of the movie),
+            // so they are deleted:
+            if skip {
+                // Subtitles can be 1 or 2 lines; we should only update
+                // skip when we have arrived at an empty line:
+                if old_line == "" {
+                    skip = false;
+                }
+                continue;
+            } else {
+                old_line
+            }
+        };
+
+        // Add \n to the lines before writing them:
+        out.write((new_line + "\n").as_bytes())
+            .expect("error writing to outputfile");
+    }
+
+    return deleted_subs;
+
 }
 
 fn process_line(line: &str, seconds: f64) -> String {
@@ -233,7 +287,7 @@ fn process_time(time: &str, incr: f64) -> String {
 }
 
 fn status(deleted_subs: i32, outputfile: &str) {
-    let mut text: String = "".to_string();
+    let mut text = String::new();
     if deleted_subs > 0 {
         if deleted_subs == 1 {
             text += "Success.\nOne subtitle was deleted at the beginning of the file.";
