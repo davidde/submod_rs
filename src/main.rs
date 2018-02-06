@@ -80,7 +80,7 @@ USAGE:
 
 fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
     // Regex to check if the inputfile was previously processed by submod:
-    let pat = Regex::new(r"\{[+-]\d+[\.\d+]_Sec\}_")
+    let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
         .expect("Error compiling regex.");
 
     let processed: bool = pat.is_match(input);
@@ -89,7 +89,7 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
 
     if processed {
         // Regex for extracting the increment number from the inputfile:
-        let num = Regex::new(r"[+-]\d+[\.\d+]")
+        let num = Regex::new(r"[+-]\d+\.\d+")
             .expect("Error compiling regex.");
 
         let capture = num.captures(input)
@@ -111,9 +111,10 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
         output = "{+".to_string() + &output[1..];
     }
 
+    let incr = format!("{:.2}", incr);
     // we can't use format! because it requires a string literal as first arg;
     // so format!(output, incr) won't compile.
-    output = output.replace("{abc.xy}", &incr.to_string());
+    output = output.replace("{abc.xy}", &incr);
 
     if change_ext {
         if output.ends_with(".srt") {
