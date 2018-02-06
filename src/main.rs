@@ -114,7 +114,7 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
     let incr = format!("{:.2}", incr);
     // we can't use format! because it requires a string literal as first arg;
     // so format!(output, incr) won't compile.
-    output = output.replace("{abc.xy}", &incr);
+    output = output.replacen("{abc.xy}", &incr, 1);
 
     if change_ext {
         if output.ends_with(".srt") {
