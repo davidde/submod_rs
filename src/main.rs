@@ -12,7 +12,7 @@ fn main() {
     let matches = App::new("submod")
         // AllowLeadingHyphen allows passing negative seconds:
         .setting(AppSettings::AllowLeadingHyphen)
-        .version("0.1.0")
+        .version("1.0.0")
         .about("Modify the time encoding of movie subtitles.")
         .arg(Arg::with_name("INPUTFILE")
             .help("The .srt or .vtt inputfile to convert")
