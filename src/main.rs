@@ -62,8 +62,9 @@ fn main() {
         let deleted_subs = convert_vtt(inputfile, &outputfile, seconds, to_srt);
         (deleted_subs, outputfile)
     } else {
+        eprintln!("error: specify either an .srt or .vtt file as input.");
         help();
-        panic!("Specify either an .srt or .vtt file as input.");
+        return;
     };
 
     status(deleted_subs, &outputfile);
