@@ -7,15 +7,16 @@ use clap::{App, Arg, AppSettings};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::path::Path;
 
 fn main() {
     let matches = App::new("submod")
         // AllowLeadingHyphen allows passing negative seconds:
         .setting(AppSettings::AllowLeadingHyphen)
         .version("1.0.0")
-        .about("Modify the time encoding of movie subtitles.")
-        .arg(Arg::with_name("INPUTFILE")
-            .help("The .srt or .vtt inputfile to convert")
+        .about("Modify the time encoding of movie subtitles.\n(Only UTF-8 encoded .srt or .vtt files.)")
+        .arg(Arg::with_name("INPUT")
+            .help("(Path to) .srt or .vtt inputfile to convert")
             .required(true)
             .index(1))
         .arg(Arg::with_name("SECONDS")
@@ -34,7 +35,7 @@ fn main() {
 
     // Calling .unwrap() is safe here because "INPUTFILE" and "SECONDS" are required.
     // If they weren't required we could use an 'if let' to conditionally get the value,
-    let inputfile = matches.value_of("INPUTFILE").unwrap();
+    let input = matches.value_of("INPUT").unwrap();
     let seconds = matches.value_of("SECONDS").unwrap();
     let seconds: f64 = match seconds.parse() {
         Ok(n) => {
@@ -53,21 +54,55 @@ fn main() {
     let to_vtt: bool = matches.is_present("vtt");
     let to_srt: bool = matches.is_present("srt");
 
-    let (deleted_subs, outputfile) = if inputfile.ends_with(".srt") {
-        let outputfile = name_output(inputfile, seconds, to_vtt);
-        let deleted_subs = convert_srt(inputfile, &outputfile, seconds, to_vtt);
-        (deleted_subs, outputfile)
+    let in_path = Path::new(input);
+    let inputfile = match in_path.file_name() {
+        Some(n) => {
+            n.to_str().expect("error: invalid unicode in filename")
+        },
+        None => {
+            eprintln!("error: incorrect path to inputfile");
+            help();
+            return;
+        },
+    };
+
+    // parent will be an empty string if the path consists of the filename alone
+    let parent = match in_path.parent() {
+        Some(n) => {
+            n.to_str().expect("error: invalid unicode in path")
+        },
+        None => {
+            eprintln!("error: incorrect path to inputfile");
+            help();
+            return;
+        },
+    };
+
+    let outputfile = if inputfile.ends_with(".srt") {
+        name_output(inputfile, seconds, to_vtt)
     } else if inputfile.ends_with(".vtt") {
-        let outputfile = name_output(inputfile, seconds, to_srt);
-        let deleted_subs = convert_vtt(inputfile, &outputfile, seconds, to_srt);
-        (deleted_subs, outputfile)
+        name_output(inputfile, seconds, to_srt)
     } else {
         eprintln!("error: specify either an .srt or .vtt file as input.");
         help();
         return;
     };
 
-    status(deleted_subs, &outputfile);
+    let out_path = if parent != "" {
+        format!("{}/{}", parent, outputfile)
+    } else {
+        outputfile.to_string()
+    };
+    let out_path = Path::new(&out_path);
+    // println!("Path: {}", out_path.display());
+
+    let deleted_subs = if outputfile.ends_with(".srt") {
+        convert_srt(in_path, out_path, seconds, to_vtt)
+    } else {
+        convert_vtt(in_path, out_path, seconds, to_srt)
+    };
+
+    status(deleted_subs, out_path);
 }
 
 fn help() {
@@ -128,21 +163,21 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
     return output;
 }
 
-fn convert_srt(input: &str, output: &str, seconds: f64, to_vtt: bool) -> i32 {
-    let f = File::open(input).expect("File not found.");
+fn convert_srt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f64, to_vtt: bool) -> i32 {
+    let f = File::open(in_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
-    let mut out = File::create(output)
+    let mut out = File::create(out_path)
         .expect("error creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2},\d{3}")
-        .expect("Error compiling regex.");
+        .expect("Error compiling regex");
 
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
-        let old_line = line.expect("Error reading line.");
+        let old_line = line.expect("Error reading line");
         let timeline: bool = re.is_match(&old_line);
 
         let new_line = if timeline {
@@ -183,21 +218,21 @@ fn convert_srt(input: &str, output: &str, seconds: f64, to_vtt: bool) -> i32 {
 
 }
 
-fn convert_vtt(input: &str, output: &str, seconds: f64, to_srt: bool) -> i32 {
-    let f = File::open(input).expect("File not found.");
+fn convert_vtt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f64, to_srt: bool) -> i32 {
+    let f = File::open(in_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
-    let mut out = File::create(output)
+    let mut out = File::create(out_path)
         .expect("error creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2}\.\d{3}")
-        .expect("Error compiling regex.");
+        .expect("Error compiling regex");
 
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
-        let old_line = line.expect("Error reading line.");
+        let old_line = line.expect("Error reading line");
         let timeline: bool = re.is_match(&old_line);
 
         let new_line = if timeline {
@@ -288,7 +323,7 @@ fn process_time(time: &str, incr: f64) -> String {
     return time_string;
 }
 
-fn status(deleted_subs: i32, outputfile: &str) {
+fn status(deleted_subs: i32, out_path: &std::path::Path) {
     let mut text = String::new();
     if deleted_subs > 0 {
         if deleted_subs == 1 {
@@ -302,5 +337,5 @@ fn status(deleted_subs: i32, outputfile: &str) {
     }
 
     println!("{}", text);
-    println!("Filename = {}", outputfile);
+    println!("File: {}", out_path.display());
 }
