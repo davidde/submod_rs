@@ -2,13 +2,13 @@ extern crate regex;
 extern crate clap;
 use clap::{App, Arg, AppSettings};
 
-use std::path::Path;
+use std::error::Error;
 
 mod convert;
 mod helpers;
 
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("submod")
         // AllowLeadingHyphen allows passing negative seconds:
         .setting(AppSettings::AllowLeadingHyphen)
@@ -38,7 +38,7 @@ fn main() {
     if !input.ends_with(".srt") && !input.ends_with(".vtt") {
         eprintln!("error: specify either an .srt or .vtt file as input.");
         helpers::help();
-        return;
+        return Ok(());
     }
     let seconds = matches.value_of("SECONDS").unwrap();
     let seconds: f64 = match seconds.parse() {
@@ -48,68 +48,15 @@ fn main() {
         Err(_) => {
             eprintln!("error: second argument not a number");
             helpers::help();
-            return;
+            return Ok(());
         },
     };
 
-    println!("convert1 = {:?}", matches.value_of("convert"));
+    let (input_path, output_path) = helpers::get_paths(input, seconds, matches.value_of("convert"))?;
 
-    // convert_to = "srt", "vtt" or "none"
-    let convert_to = if let Some(s) = matches.value_of("convert") {
-      let allowed = ["srt", "vtt"];
-      if allowed.contains(&s) {
-        s
-      } else {
-          eprintln!("error: conversion to .{} not supported", s);
-          helpers::help();
-          return;
-      }
-    } else {
-      "none"
-    };
+    let deleted_subs = convert::convert(&input_path, &output_path, seconds);
 
-    println!("convert2 = {}", convert_to);
+    helpers::status(deleted_subs, &output_path);
 
-    // Create full path for inputfile:
-    let input_path = Path::new(input);
-    // Find input filename without path:
-    let input_file = match input_path.file_name() {
-        Some(n) => {
-            n.to_str().expect("error: invalid unicode in filename")
-        },
-        None => {
-            eprintln!("error: incorrect path to inputfile");
-            helpers::help();
-            return;
-        },
-    };
-
-    // Find parent: path without filename
-    // => parent will be an empty string if the path consists of the filename alone
-    let parent = match input_path.parent() {
-        Some(n) => {
-            n.to_str().expect("error: invalid unicode in path")
-        },
-        None => {
-            eprintln!("error: incorrect path to inputfile");
-            helpers::help();
-            return;
-        },
-    };
-
-    // Create name for ouputfile:
-    let outputfile = helpers::name_output(input_file, seconds, convert_to);
-
-    // Create full path for outputfile:
-    let output_path = if parent != "" {
-        format!("{}/{}", parent, outputfile)
-    } else {
-        outputfile.to_string()
-    };
-    let output_path = Path::new(&output_path);
-    // println!("Path: {}", output_path.display());
-
-    let deleted_subs = convert::convert(input_path, output_path, seconds);
-
-    helpers::status(deleted_subs, output_path);
+    return Ok(());
 }

@@ -4,10 +4,10 @@ use regex::Regex;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::PathBuf;
 
 
-pub fn convert(input_path: &Path, output_path: &Path, seconds: f64) -> i32 {
+pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> i32 {
     let f = File::open(input_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
