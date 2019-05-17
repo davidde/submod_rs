@@ -23,19 +23,24 @@ fn main() {
             .help("Seconds by which to add or subtract the time encoding")
             .required(true)
             .index(2))
-        .arg(Arg::with_name("srt")
-            .short("s")
-            .long("srt")
-            .help("Convert the .vtt file to .srt"))
-        .arg(Arg::with_name("vtt")
-            .short("v")
-            .long("vtt")
-            .help("Convert the .srt file to .vtt"))
+        .arg(Arg::with_name("convert")
+            .help("Convert to .srt or .vtt format")
+            .short("c")
+            .long("convert")
+            .value_name("srt, vtt")
+            .takes_value(true))
         .get_matches();
 
-    // Calling .unwrap() is safe here because "INPUTFILE" and "SECONDS" are required.
-    // If they weren't required we could use an 'if let' to conditionally get the value,
+    // Check and prepare all arguments for program start:
+
+    // Calling .unwrap() on "INPUT" and "SECONDS" is safe because both are required arguments.
+    // (If they weren't required we could use an 'if let' to conditionally get the value)
     let input = matches.value_of("INPUT").unwrap();
+    if !input.ends_with(".srt") && !input.ends_with(".vtt") {
+        eprintln!("error: specify either an .srt or .vtt file as input.");
+        help();
+        return;
+    }
     let seconds = matches.value_of("SECONDS").unwrap();
     let seconds: f64 = match seconds.parse() {
         Ok(n) => {
@@ -48,14 +53,28 @@ fn main() {
         },
     };
 
-    // These bools can be ignored if they are the same type as the inputfile;
-    // they signify to convert to the opposite extension than the input:
-    // e.g. if to_vtt == true, we convert the srt input to vtt.
-    let to_vtt: bool = matches.is_present("vtt");
-    let to_srt: bool = matches.is_present("srt");
+    println!("convert1 = {:?}", matches.value_of("convert"));
 
-    let in_path = Path::new(input);
-    let inputfile = match in_path.file_name() {
+    // convert_to = "srt", "vtt" or "none"
+    let convert_to = if let Some(s) = matches.value_of("convert") {
+      let allowed = ["srt", "vtt"];
+      if allowed.contains(&s) {
+        s
+      } else {
+          eprintln!("error: conversion to .{} not supported", s);
+          help();
+          return;
+      }
+    } else {
+      "none"
+    };
+
+    println!("convert2 = {}", convert_to);
+
+    // Create full path for inputfile:
+    let input_path = Path::new(input);
+    // Find input filename without path:
+    let input_file = match input_path.file_name() {
         Some(n) => {
             n.to_str().expect("error: invalid unicode in filename")
         },
@@ -66,8 +85,9 @@ fn main() {
         },
     };
 
-    // parent will be an empty string if the path consists of the filename alone
-    let parent = match in_path.parent() {
+    // Find parent: path without filename
+    // => parent will be an empty string if the path consists of the filename alone
+    let parent = match input_path.parent() {
         Some(n) => {
             n.to_str().expect("error: invalid unicode in path")
         },
@@ -78,31 +98,25 @@ fn main() {
         },
     };
 
-    let outputfile = if inputfile.ends_with(".srt") {
-        name_output(inputfile, seconds, to_vtt)
-    } else if inputfile.ends_with(".vtt") {
-        name_output(inputfile, seconds, to_srt)
-    } else {
-        eprintln!("error: specify either an .srt or .vtt file as input.");
-        help();
-        return;
-    };
+    // Create name for ouputfile:
+    let outputfile = name_output(input_file, seconds, convert_to);
 
-    let out_path = if parent != "" {
+    // Create full path for outputfile:
+    let output_path = if parent != "" {
         format!("{}/{}", parent, outputfile)
     } else {
         outputfile.to_string()
     };
-    let out_path = Path::new(&out_path);
-    // println!("Path: {}", out_path.display());
+    let output_path = Path::new(&output_path);
+    // println!("Path: {}", output_path.display());
 
     let deleted_subs = if outputfile.ends_with(".srt") {
-        convert_srt(in_path, out_path, seconds, to_vtt)
+        convert_srt(input_path, output_path, seconds)
     } else {
-        convert_vtt(in_path, out_path, seconds, to_srt)
+        convert_vtt(input_path, output_path, seconds)
     };
 
-    status(deleted_subs, out_path);
+    status(deleted_subs, output_path);
 }
 
 fn help() {
@@ -114,21 +128,21 @@ USAGE:
 ");
 }
 
-fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
+fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
     // Regex to check if the inputfile was previously processed by submod:
     let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
         .expect("Error compiling regex.");
 
-    let processed: bool = pat.is_match(input);
-    let mut incr: f64 = 0.0;
-    let mut output = String::new();
+    let processed: bool = pat.is_match(input_file);
+    let mut incr: f64;
+    let mut output: String;
 
     if processed {
         // Regex for extracting the increment number from the inputfile:
         let num = Regex::new(r"[+-]\d+\.\d+")
             .expect("Error compiling regex.");
 
-        let capture = num.captures(input)
+        let capture = num.captures(input_file)
             .expect("No number found in filename");
         incr = capture.get(0)
             .unwrap().as_str()
@@ -136,11 +150,11 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
 
         incr += seconds;
 
-        let index = pat.find(input).unwrap();
-        output = "{{abc.xy}_Sec}_".to_string() + &input[index.end()..];
+        let index = pat.find(input_file).unwrap();
+        output = "{{abc.xy}_Sec}_".to_string() + &input_file[index.end()..];
     } else {
         incr = seconds;
-        output = "{{abc.xy}_Sec}_".to_string() + input;
+        output = "{{abc.xy}_Sec}_".to_string() + input_file;
     }
 
     if incr >= 0.0 {
@@ -152,22 +166,21 @@ fn name_output(input: &str, seconds: f64, change_ext: bool) -> String {
     // so format!(output, incr) won't compile.
     output = output.replacen("{abc.xy}", &incr, 1);
 
-    if change_ext {
-        if output.ends_with(".srt") {
-            output = output.replace(".srt", ".vtt");
-        } else if output.ends_with(".vtt") {
-            output = output.replace(".vtt", ".srt");
-        }
+    let from_ext = &input_file[input_file.len()-3..];
+    if from_ext != to_ext && to_ext != "none" {
+      let len = output.len();
+      output.truncate(len - 3);
+      output = output + to_ext;
     }
 
     return output;
 }
 
-fn convert_srt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f64, to_vtt: bool) -> i32 {
-    let f = File::open(in_path).expect("error: file not found");
+fn convert_srt(input_path: &std::path::Path, output_path: &std::path::Path, seconds: f64) -> i32 {
+    let f = File::open(input_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
-    let mut out = File::create(out_path)
+    let mut out = File::create(output_path)
         .expect("error creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2},\d{3}")
@@ -187,7 +200,7 @@ fn convert_srt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f
                 deleted_subs += 1;
                 skip = true;
                 new_line
-            } else if to_vtt {
+            } else if input_path.extension() != output_path.extension() { // return vtt:
                 new_line
             } else {
                 // Convert back to '.srt' style:
@@ -218,11 +231,11 @@ fn convert_srt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f
 
 }
 
-fn convert_vtt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f64, to_srt: bool) -> i32 {
-    let f = File::open(in_path).expect("error: file not found");
+fn convert_vtt(input_path: &std::path::Path, output_path: &std::path::Path, seconds: f64) -> i32 {
+    let f = File::open(input_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
-    let mut out = File::create(out_path)
+    let mut out = File::create(output_path)
         .expect("error creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2}\.\d{3}")
@@ -241,7 +254,7 @@ fn convert_vtt(in_path: &std::path::Path, out_path: &std::path::Path, seconds: f
                 deleted_subs += 1;
                 skip = true;
                 new_line
-            } else if to_srt {
+            } else if input_path.extension() != output_path.extension() {
                 // Convert back to '.srt' style:
                 new_line.replace(".", ",")
             } else {
@@ -323,7 +336,7 @@ fn process_time(time: &str, incr: f64) -> String {
     return time_string;
 }
 
-fn status(deleted_subs: i32, out_path: &std::path::Path) {
+fn status(deleted_subs: i32, output_path: &std::path::Path) {
     let mut text = String::new();
     if deleted_subs > 0 {
         if deleted_subs == 1 {
@@ -337,5 +350,5 @@ fn status(deleted_subs: i32, out_path: &std::path::Path) {
     }
 
     println!("{}", text);
-    println!("File: {}", out_path.display());
+    println!("File: {}", output_path.display());
 }
