@@ -110,11 +110,7 @@ fn main() {
     let output_path = Path::new(&output_path);
     // println!("Path: {}", output_path.display());
 
-    let deleted_subs = if outputfile.ends_with(".srt") {
-        convert_srt(input_path, output_path, seconds)
-    } else {
-        convert_vtt(input_path, output_path, seconds)
-    };
+    let deleted_subs = convert(input_path, output_path, seconds);
 
     status(deleted_subs, output_path);
 }
@@ -176,14 +172,14 @@ fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
     return output;
 }
 
-fn convert_srt(input_path: &std::path::Path, output_path: &std::path::Path, seconds: f64) -> i32 {
+fn convert(input_path: &std::path::Path, output_path: &std::path::Path, seconds: f64) -> i32 {
     let f = File::open(input_path).expect("error: file not found");
     let reader = BufReader::new(f);
 
     let mut out = File::create(output_path)
         .expect("error creating outputfile");
 
-    let re = Regex::new(r"\d{2}:\d{2}:\d{2},\d{3}")
+    let re = Regex::new(r"\d{2}:\d{2}:\d{2}[,.]\d{3}")
         .expect("Error compiling regex");
 
     let mut skip: bool = false;
@@ -192,19 +188,17 @@ fn convert_srt(input_path: &std::path::Path, output_path: &std::path::Path, seco
     for line in reader.lines() {
         let old_line = line.expect("Error reading line");
         let timeline: bool = re.is_match(&old_line);
+        let mut new_line;
 
-        let new_line = if timeline {
-            let mut new_line = old_line.replace(",", ".");
+        if timeline {
+            new_line = old_line.replace(",", ".");
             new_line = process_line(&new_line, seconds);
             if new_line == "(DELETED)\n" {
                 deleted_subs += 1;
                 skip = true;
-                new_line
-            } else if input_path.extension() != output_path.extension() { // return vtt:
-                new_line
-            } else {
+            } else if output_path.extension().unwrap() == "srt" {
                 // Convert back to '.srt' style:
-                new_line.replace(".", ",")
+                new_line = new_line.replace(".", ",");
             }
         } else {
             // When skip = True, subtitles are shifted too far back
@@ -218,7 +212,7 @@ fn convert_srt(input_path: &std::path::Path, output_path: &std::path::Path, seco
                 }
                 continue;
             } else {
-                old_line
+                new_line = old_line;
             }
         };
 
@@ -228,61 +222,6 @@ fn convert_srt(input_path: &std::path::Path, output_path: &std::path::Path, seco
     }
 
     return deleted_subs;
-
-}
-
-fn convert_vtt(input_path: &std::path::Path, output_path: &std::path::Path, seconds: f64) -> i32 {
-    let f = File::open(input_path).expect("error: file not found");
-    let reader = BufReader::new(f);
-
-    let mut out = File::create(output_path)
-        .expect("error creating outputfile");
-
-    let re = Regex::new(r"\d{2}:\d{2}:\d{2}\.\d{3}")
-        .expect("Error compiling regex");
-
-    let mut skip: bool = false;
-    let mut deleted_subs = 0;
-
-    for line in reader.lines() {
-        let old_line = line.expect("Error reading line");
-        let timeline: bool = re.is_match(&old_line);
-
-        let new_line = if timeline {
-            let new_line = process_line(&old_line, seconds);
-            if new_line == "(DELETED)\n" {
-                deleted_subs += 1;
-                skip = true;
-                new_line
-            } else if input_path.extension() != output_path.extension() {
-                // Convert back to '.srt' style:
-                new_line.replace(".", ",")
-            } else {
-                new_line
-            }
-        } else {
-            // When skip = True, subtitles are shifted too far back
-            // into the past (before the start of the movie),
-            // so they are deleted:
-            if skip {
-                // Subtitles can be 1 or 2 lines; we should only update
-                // skip when we have arrived at an empty line:
-                if old_line == "" {
-                    skip = false;
-                }
-                continue;
-            } else {
-                old_line
-            }
-        };
-
-        // Add \n to the lines before writing them:
-        out.write((new_line + "\n").as_bytes())
-            .expect("error writing to outputfile");
-    }
-
-    return deleted_subs;
-
 }
 
 fn process_line(line: &str, seconds: f64) -> String {
