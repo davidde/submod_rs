@@ -5,23 +5,22 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::error::Error;
 
 
-pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> i32 {
-    let f = File::open(input_path).expect("file not found");
+pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Result<i32, Box<Error>> {
+    let f = File::open(input_path)?;
     let reader = BufReader::new(f);
 
-    let mut out = File::create(output_path)
-        .expect("failed creating outputfile");
+    let mut out = File::create(output_path)?;
 
-    let re = Regex::new(r"\d{2}:\d{2}:\d{2}[,.]\d{3}")
-        .expect("failed compiling regex");
+    let re = Regex::new(r"\d{2}:\d{2}:\d{2}[,.]\d{3}")?;
 
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
-        let old_line = line.expect("failed reading line");
+        let old_line = line?;
         let timeline: bool = re.is_match(&old_line);
         let mut new_line;
 
@@ -52,11 +51,10 @@ pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> i32
         };
 
         // Add \n to the lines before writing them:
-        out.write((new_line + "\n").as_bytes())
-            .expect("failed writing to outputfile");
+        out.write((new_line + "\n").as_bytes())?;
     }
 
-    return deleted_subs;
+    return Ok(deleted_subs);
 }
 
 fn process_line(line: &str, seconds: f64) -> String {

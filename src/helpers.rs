@@ -107,15 +107,6 @@ fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
     return output;
 }
 
-pub fn report_error(error: &str) {
-    eprintln!("\u{001b}[38;5;208mError:\u{001b}[0m {}\n", error);
-    println!("USAGE:\n    \
-                submod [FLAGS] [OPTIONS] <INPUT> <SECONDS>\n        \
-                    INPUT: (Path to) .srt or .vtt subtitle file to convert\n        \
-                    SECONDS: seconds to add or subtract from time encoding\n\n\
-                    For more information try \u{001b}[32m--help\u{001b}[0m");
-}
-
 pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
     if input.ends_with(".srt") || input.ends_with(".vtt") {
         return Ok(());
@@ -125,29 +116,33 @@ pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
 }
 
 pub fn is_float(seconds: String) -> Result<(), String> {
-    match seconds.parse::<f64>() {
-        Ok(_) => {
-            Ok(())
-        },
-        Err(_) => {
-            Err("should be a number".to_string())
-        },
+    if let Ok(_) = seconds.parse::<f64>() {
+        Ok(())
+    } else {
+        Err("should be a number".to_string())
     }
 }
 
-pub fn status(deleted_subs: i32, output_path: &PathBuf) {
-    let mut text = String::new();
+pub fn report_error(error: &str) {
+    eprintln!("\u{001b}[38;5;208mError:\u{001b}[0m {}\n", error);
+    println!("USAGE:\n    \
+                submod [FLAGS] [OPTIONS] <INPUT> <SECONDS>\n        \
+                    INPUT: (Path to) .srt or .vtt subtitle file to convert\n        \
+                    SECONDS: seconds to add or subtract from time encoding\n\n\
+                    For more information try \u{001b}[32m--help\u{001b}[0m");
+}
+
+pub fn report_success(deleted_subs: i32, output_path: &PathBuf) {
+    println!("\u{001b}[32;1mSuccess.\u{001b}[0m");
+
     if deleted_subs > 0 {
         if deleted_subs == 1 {
-            text += "Success.\nOne subtitle was deleted at the beginning of the file.";
+            println!("    \u{001b}[41;1m ! \u{001b}[0m   One subtitle was deleted at the beginning of the file.");
         } else {
-            text = format!("Success.\n{} subtitles were deleted at the beginning of the file.",
+            println!("    \u{001b}[41;1m ! \u{001b}[0m   {} subtitles were deleted at the beginning of the file.",
                 deleted_subs);
         }
-    } else {
-        text = "Success.".to_string();
     }
 
-    println!("{}", text);
-    println!("File: {}", output_path.display());
+    println!(" Output: \u{001b}[1m \u{001b}[48;5;238m {} \u{001b}[0m", output_path.display());
 }
