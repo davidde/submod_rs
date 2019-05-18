@@ -5,10 +5,11 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::error::Error;
+
+use failure::Error;
 
 
-pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Result<i32, Box<Error>> {
+pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Result<i32, Error> {
     let f = File::open(input_path)?;
     let reader = BufReader::new(f);
 

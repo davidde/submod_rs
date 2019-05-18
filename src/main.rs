@@ -1,6 +1,8 @@
 extern crate regex;
 extern crate clap;
 use clap::{App, Arg, AppSettings};
+#[macro_use]
+extern crate failure;
 
 mod convert;
 mod helpers;
@@ -42,7 +44,7 @@ fn main() {
     let (input_path, output_path) = match helpers::get_paths(input, seconds, matches.value_of("convert")) {
         Ok(paths) => paths,
         Err(error) => {
-            helpers::report_error(&error);
+            helpers::report_error(error);
             return;
         }
     };
@@ -50,7 +52,7 @@ fn main() {
     let deleted_subs = match convert::convert(&input_path, &output_path, seconds) {
         Ok(num) => num,
         Err(error) => {
-            helpers::report_error(&*error.to_string());
+            helpers::report_error(error);
             return;
         }
     };

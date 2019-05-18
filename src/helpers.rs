@@ -3,9 +3,12 @@ use regex::Regex;
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::ffi::OsStr;
+
+use failure::Error;
 
 
-pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(PathBuf, PathBuf), String> {
+pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(PathBuf, PathBuf), Error> {
 
     println!("convert1 = {:?}", convert);
 
@@ -23,26 +26,18 @@ pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(Pa
 
     // Create full path for inputfile:
     let input_path = Path::new(input);
-    // Find input filename without path:
-    let input_file = match input_path.file_name() {
-        Some(n) => {
-            n.to_str().expect("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid unicode")
-        },
-        None => {
-            return Err("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': no file".to_owned());
-        },
-    };
+
+    // Find input filename without the path:
+    let input_file = input_path.file_name()
+        .and_then(OsStr::to_str)
+        .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?;
 
     // Find parent: path without filename
     // => parent will be an empty string if the path consists of the filename alone
-    let parent = match input_path.parent() {
-        Some(n) => {
-            n.to_str().expect("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid unicode")
-        },
-        None => {
-            return Err("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path".to_owned());
-        },
-    };
+    let parent = input_path.parent()
+        .and_then(Path::to_str)
+        .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
+
 
     // Create name for ouputfile:
     let outputfile = name_output(input_file, seconds, to_ext);
@@ -123,7 +118,7 @@ pub fn is_float(seconds: String) -> Result<(), String> {
     }
 }
 
-pub fn report_error(error: &str) {
+pub fn report_error(error: Error) {
     eprintln!("\u{001b}[38;5;208mError:\u{001b}[0m {}\n", error);
     println!("USAGE:\n    \
                 submod [FLAGS] [OPTIONS] <INPUT> <SECONDS>\n        \

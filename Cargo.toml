@@ -6,3 +6,4 @@ authors = ["DavidDeprost <dadeprost@gmail.com>"]
 [dependencies]
 regex = "0.2"
 clap = "~2.29"
+failure = "0.1.5"
