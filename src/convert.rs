@@ -8,20 +8,20 @@ use std::path::PathBuf;
 
 
 pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> i32 {
-    let f = File::open(input_path).expect("error: file not found");
+    let f = File::open(input_path).expect("file not found");
     let reader = BufReader::new(f);
 
     let mut out = File::create(output_path)
-        .expect("error creating outputfile");
+        .expect("failed creating outputfile");
 
     let re = Regex::new(r"\d{2}:\d{2}:\d{2}[,.]\d{3}")
-        .expect("Error compiling regex");
+        .expect("failed compiling regex");
 
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
-        let old_line = line.expect("Error reading line");
+        let old_line = line.expect("failed reading line");
         let timeline: bool = re.is_match(&old_line);
         let mut new_line;
 
@@ -53,7 +53,7 @@ pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> i32
 
         // Add \n to the lines before writing them:
         out.write((new_line + "\n").as_bytes())
-            .expect("error writing to outputfile");
+            .expect("failed writing to outputfile");
     }
 
     return deleted_subs;

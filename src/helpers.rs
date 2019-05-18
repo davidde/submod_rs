@@ -11,13 +11,7 @@ pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(Pa
 
     let to_ext = match convert {
         Some(ext) => {
-            let allowed = ["srt", "vtt"];
-            if allowed.contains(&ext) {
-                ext
-            } else {
-                let error = format!("error: conversion to .{} not supported", ext);
-                return Err(error);
-            }
+            ext
         },
         None => {
             // Return input extension:
@@ -32,10 +26,10 @@ pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(Pa
     // Find input filename without path:
     let input_file = match input_path.file_name() {
         Some(n) => {
-            n.to_str().expect("error: invalid unicode in filename")
+            n.to_str().expect("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid unicode")
         },
         None => {
-            return Err("error: incorrect path to inputfile".to_owned());
+            return Err("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': no file".to_owned());
         },
     };
 
@@ -43,10 +37,10 @@ pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(Pa
     // => parent will be an empty string if the path consists of the filename alone
     let parent = match input_path.parent() {
         Some(n) => {
-            n.to_str().expect("error: invalid unicode in path")
+            n.to_str().expect("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid unicode")
         },
         None => {
-            return Err("error: incorrect path to inputfile".to_owned());
+            return Err("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path".to_owned());
         },
     };
 
@@ -113,13 +107,32 @@ fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
     return output;
 }
 
-pub fn help() {
-    println!("
-USAGE:
-    submod <INPUTFILE> <SECONDS>
-        INPUTFILE: .srt or .vtt subtitle file
-        SECONDS: seconds to add or subtract from time encoding
-");
+pub fn report_error(error: &str) {
+    eprintln!("\u{001b}[38;5;208mError:\u{001b}[0m {}\n", error);
+    println!("USAGE:\n    \
+                submod [FLAGS] [OPTIONS] <INPUT> <SECONDS>\n        \
+                    INPUT: (Path to) .srt or .vtt subtitle file to convert\n        \
+                    SECONDS: seconds to add or subtract from time encoding\n\n\
+                    For more information try \u{001b}[32m--help\u{001b}[0m");
+}
+
+pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
+    if input.ends_with(".srt") || input.ends_with(".vtt") {
+        return Ok(());
+    }
+    Err(String::from("incorrect file extension\n\n\
+        Only \u{001b}[32m.srt\u{001b}[0m or \u{001b}[32m.vtt\u{001b}[0m files allowed."))
+}
+
+pub fn is_float(seconds: String) -> Result<(), String> {
+    match seconds.parse::<f64>() {
+        Ok(_) => {
+            Ok(())
+        },
+        Err(_) => {
+            Err("should be a number".to_string())
+        },
+    }
 }
 
 pub fn status(deleted_subs: i32, output_path: &PathBuf) {
