@@ -8,53 +8,41 @@ use std::ffi::OsStr;
 use failure::Error;
 
 
-pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>) -> Result<(PathBuf, PathBuf), Error> {
-
-    println!("convert1 = {:?}", convert);
-
-    let to_ext = match convert {
-        Some(ext) => {
-            ext
-        },
-        None => {
-            // Return input extension:
-            &input[input.len()-3..]
-        },
-    };
-
-    println!("convert2 = {}", to_ext);
-
+pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>)
+    -> Result<(PathBuf, PathBuf), Error>
+{
     // Create full path for inputfile:
     let input_path = Path::new(input);
 
-    // Find input filename without the path:
-    let input_file = input_path.file_name()
-        .and_then(OsStr::to_str)
-        .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?;
-
     // Find parent: path without filename
-    // => parent will be an empty string if the path consists of the filename alone
-    let parent = input_path.parent()
-        .and_then(Path::to_str)
+    // => parent will be empty if the path consists of the filename alone
+    let input_parent = input_path.parent()
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
 
+    // Find input file name without path:
+    let input_file = input_path.file_name()
+        // Notice difference between both `and_then` calls:
+        .and_then(OsStr::to_str) // to_str returns an Option
+        .and_then(|str| Some(str.to_owned())) // to_owned doesn't, so we need to manually wrap return value in Some!
+        .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?;
 
-    // Create name for ouputfile:
-    let outputfile = name_output(input_file, seconds, to_ext);
+    // Create name for output file:
+    let mut output_file = input_file;
+    // Change extension if necessary:
+    if let Some(to_ext) = convert {
+        let len = output_file.len();
+        output_file.truncate(len - 3);
+        output_file.push_str(to_ext);
+    }
+    output_file = name_output(&output_file, seconds);
 
-    // Create full path for outputfile:
-    let output_path = if parent != "" {
-        format!("{}/{}", parent, outputfile)
-    } else {
-        outputfile.to_string()
-    };
-    let output_path = Path::new(&output_path);
-    // println!("Path: {}", output_path.display());
+    // Create full path for output file:
+    let output_path = Path::new(input_parent).join(output_file);
 
-    return Ok( (input_path.to_owned(), output_path.to_owned()) );
+    return Ok( ( input_path.to_owned(), output_path.to_owned() ) );
 }
 
-fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
+fn name_output(input_file: &str, seconds: f64) -> String {
     // Regex to check if the inputfile was previously processed by submod:
     let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
         .expect("Error compiling regex.");
@@ -91,13 +79,6 @@ fn name_output(input_file: &str, seconds: f64, to_ext: &str) -> String {
     // we can't use format! because it requires a string literal as first arg;
     // so format!(output, incr) won't compile.
     output = output.replacen("{abc.xy}", &incr, 1);
-
-    let from_ext = &input_file[input_file.len()-3..];
-    if from_ext != to_ext {
-        let len = output.len();
-        output.truncate(len - 3);
-        output = output + to_ext;
-    }
 
     return output;
 }

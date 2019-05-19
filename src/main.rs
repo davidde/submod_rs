@@ -14,7 +14,7 @@ fn main() {
         .version_short("v")
         // AllowLeadingHyphen allows passing negative seconds:
         .setting(AppSettings::AllowLeadingHyphen)
-        .about("Modify the time encoding of movie subtitles.\n(Only UTF-8 encoded .srt or .vtt files)")
+        .about("Modify the time encoding of movie subtitles.\n(UTF-8 encoded .srt or .vtt files)")
         .arg(Arg::with_name("INPUT")
             .help("(Path to) .srt or .vtt subtitle file to convert")
             .required(true)
@@ -26,7 +26,7 @@ fn main() {
             .index(2)
             .validator(helpers::is_float))
         .arg(Arg::with_name("convert")
-            .help("Convert to other subtitle format")
+            .help("Converts to other subtitle format")
             .short("c")
             .long("convert")
             .value_name("extension")
