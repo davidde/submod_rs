@@ -16,32 +16,35 @@ pub fn get_paths(input: &str, seconds: f64, convert: Option<&str>)
 
     // Find parent: path without filename
     // => parent will be empty if the path consists of the filename alone
-    let input_parent = input_path.parent()
+    let parent = input_path.parent()
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
 
-    // Find input file name without path:
-    let input_file = input_path.file_name()
-        // Notice difference between both `and_then` calls:
-        .and_then(OsStr::to_str) // to_str returns an Option
-        .and_then(|str| Some(str.to_owned())) // to_owned doesn't, so we need to manually wrap return value in Some!
+    // Create output file name without path:
+    let mut output_file = input_path.file_name() // returns Option<&OsStr>
+        .and_then(OsStr::to_str) // returns Option<&str>
+        .and_then(|filename| {
+            let mut filename = filename.to_owned();
+            // Change extension if necessary:
+            if let Some(to_ext) = convert {
+                let len = filename.len();
+                filename.truncate(len - 3);
+                filename.push_str(to_ext);
+            }
+            // the closure needs to manually wrap its return value with Some:
+            Some(filename) // returns Option<String>
+        })
+        // transform to Result<String> and finally convert to String with `?`:
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?;
-
-    // Create name for output file:
-    let mut output_file = input_file;
-    // Change extension if necessary:
-    if let Some(to_ext) = convert {
-        let len = output_file.len();
-        output_file.truncate(len - 3);
-        output_file.push_str(to_ext);
-    }
     output_file = name_output(&output_file, seconds);
 
     // Create full path for output file:
-    let output_path = Path::new(input_parent).join(output_file);
+    let output_path = Path::new(parent).join(output_file);
 
     return Ok( ( input_path.to_owned(), output_path.to_owned() ) );
 }
 
+/// This functions smartly formats the default output file name,
+/// such that output files that are used as input again receive a sane name.
 fn name_output(input_file: &str, seconds: f64) -> String {
     // Regex to check if the inputfile was previously processed by submod:
     let pat = Regex::new(r"\{[+-]\d+\.\d+_Sec\}_")
@@ -88,7 +91,7 @@ pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
         return Ok(());
     }
     Err(String::from("incorrect file extension\n\n\
-        Only \u{001b}[32m.srt\u{001b}[0m or \u{001b}[32m.vtt\u{001b}[0m files allowed."))
+        Only \u{001b}[32m.srt\u{001b}[0m or \u{001b}[32m.vtt\u{001b}[0m files are allowed."))
 }
 
 pub fn is_float(seconds: String) -> Result<(), String> {
