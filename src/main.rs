@@ -31,7 +31,21 @@ fn main() {
             .long("convert")
             .value_name("extension")
             .takes_value(true)
-            .possible_values(&["srt", "vtt"]));
+            .possible_values(&["srt", "vtt"]))
+        .arg(Arg::with_name("begin")
+            .help("Indicates at what time the modification will begin")
+            .short("b")
+            .long("begin")
+            .value_name("hh:mm:ss")
+            .takes_value(true)
+            .validator(helpers::is_timing))
+        .arg(Arg::with_name("stop")
+            .help("Indicates at what time the modification will stop")
+            .short("s")
+            .long("stop")
+            .value_name("hh:mm:ss")
+            .takes_value(true)
+            .validator(helpers::is_timing));
     let matches = app.get_matches();
 
     // Calling .unwrap() on "INPUT" and "SECONDS" is safe because both are required arguments.

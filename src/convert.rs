@@ -15,19 +15,25 @@ pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Res
 
     let mut out = File::create(output_path)?;
 
-    let re = Regex::new(r"\d{2}:\d{2}:\d{2}[,.]\d{3}")?;
+    let timing = Regex::new(r"(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})$")?;
 
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
         let old_line = line?;
-        let timeline: bool = re.is_match(&old_line);
+        let is_timeline: bool = timing.is_match(&old_line);
         let mut new_line;
 
-        if timeline {
-            new_line = old_line.replace(",", ".");
-            new_line = process_line(&new_line, seconds);
+        if is_timeline {
+            let time_line = old_line.replace(",", ".");
+            // Return the capture groups corresponding to the leftmost first match:
+            let caps = timing.captures(&time_line).unwrap();
+            // Extract start and stop times, notice 2 ways of doing this:
+            let start_string = caps.get(1).unwrap().as_str();
+            let end_string = caps.get(2).map_or("", |m| m.as_str());
+            new_line = build_line(start_string, end_string, seconds);
+
             if new_line == "(DELETED)\n" {
                 deleted_subs += 1;
                 skip = true;
@@ -58,42 +64,37 @@ pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Res
     return Ok(deleted_subs);
 }
 
-fn process_line(line: &str, seconds: f64) -> String {
-    // '&' is necessary here!?
-    let start = &line[0..12];
-    let start = process_time(start, seconds);
+fn build_line(start_string: &str, end_string: &str, seconds: f64) -> String {
+    let start_secs = get_secs(start_string);
+    let end_secs = get_secs(end_string);
 
-    let end = &line[17..29];
-    let end = process_time(end, seconds);
+    let start_string = build_time_string(start_secs, seconds);
+    let end_string = build_time_string(end_secs, seconds);
 
-    let line = if start == "(DELETED)\n" {
-        if end == "(DELETED)\n" {
-            String::from("(DELETED)\n")
+    let line = if start_string == "(DELETED)\n" {
+        if end_string == "(DELETED)\n" {
+            end_string
         } else {
-            format!("00:00:00.000 --> {}", end)
+            format!("00:00:00.000 --> {}", end_string)
         }
     } else {
-        format!("{} --> {}", start, end)
+        format!("{} --> {}", start_string, end_string)
     };
 
     return line;
 }
 
-fn process_time(time: &str, incr: f64) -> String {
-    // '&' is not allowed here!?
-    let mut hours: f64 = time[0..2].parse()
-        .expect("error: invalid hour field in timeline");
-    hours *= 3600.0;
+fn get_secs(time_string: &str) -> f64 {
+    time_string.rsplit(":")
+        .map(|t| t.parse::<f64>().unwrap())
+        .zip(&[1.0, 60.0, 3600.0])
+        .map(|(a, b)| a * b)
+        .sum()
+}
 
-    let mut mins: f64 = time[3..5].parse()
-        .expect("error: invalid minutes field in timeline");
-    mins *= 60.0;
-
-    let secs: f64 = time[6..12].parse()
-        .expect("error: invalid seconds field in timeline");
-
+fn build_time_string(seconds: f64, incr: f64) -> String {
     // incr can be negative, so the new time could be too:
-    let new_time = hours + mins + secs + incr;
+    let new_time = seconds + incr;
 
     let time_string = if new_time >= 0.0 {
         let hours = new_time as u64 / 3600;
