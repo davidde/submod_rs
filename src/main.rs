@@ -53,9 +53,12 @@ fn main() {
     let input = matches.value_of("INPUT").unwrap();
     let seconds: f64 = matches.value_of("SECONDS").unwrap().parse().unwrap();
     // The second unwrap call on parse() is also safe because we've already
-    // validated SECONDS as a float during argument parsing (using is_float())
+    // validated SECONDS as a float during argument parsing (using helpers::is_float)
+    let convert = matches.value_of("convert");
+    let _begin = matches.value_of("begin");
+    let _stop = matches.value_of("stop");
 
-    let (input_path, output_path) = match helpers::get_paths(input, seconds, matches.value_of("convert")) {
+    let (input_path, output_path) = match helpers::get_paths(input, seconds, convert) {
         Ok(paths) => paths,
         Err(error) => {
             helpers::report_error(error);
@@ -63,7 +66,8 @@ fn main() {
         }
     };
 
-    let deleted_subs = match convert::convert(&input_path, &output_path, seconds) {
+    // Transform the file and return the number of deleted subtitles, if any:
+    let deleted_subs = match convert::convert(input_path, &output_path, seconds) {
         Ok(num) => num,
         Err(error) => {
             helpers::report_error(error);

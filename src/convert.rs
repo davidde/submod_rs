@@ -1,15 +1,13 @@
-extern crate regex;
-use regex::Regex;
-
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use regex::Regex;
 use failure::Error;
 
 
-pub fn convert(input_path: &PathBuf, output_path: &PathBuf, seconds: f64) -> Result<i32, Error> {
+pub fn convert(input_path: &Path, output_path: &PathBuf, seconds: f64) -> Result<i32, Error> {
     let f = File::open(input_path)?;
     let reader = BufReader::new(f);
 
@@ -84,9 +82,11 @@ fn build_line(start_string: &str, end_string: &str, seconds: f64) -> String {
     return line;
 }
 
+/// Processes a &str of the form 'hh:mm:ss.sss'
+/// into the total number of seconds as f64.
 fn get_secs(time_string: &str) -> f64 {
     time_string.rsplit(":")
-        .map(|t| t.parse::<f64>().unwrap())
+        .map(|t| t.parse::<f64>().unwrap()) // can't panic since time_string is validated by regex!
         .zip(&[1.0, 60.0, 3600.0])
         .map(|(a, b)| a * b)
         .sum()
