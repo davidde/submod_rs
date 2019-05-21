@@ -17,21 +17,13 @@ pub fn get_paths<'a>(input: &'a str, seconds: f64, convert: Option<&str>)
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
 
     // Create output file name without path:
-    let mut output_file = input_path.file_name() // returns Option<&OsStr>
-        .and_then(OsStr::to_str) // returns Option<&str>
-        .and_then(|filename| {
-            let mut filename = filename.to_owned();
-            // Change extension if necessary:
-            if let Some(to_ext) = convert {
-                let len = filename.len();
-                filename.truncate(len - 3);
-                filename.push_str(to_ext);
-            }
-            // The closure needs to manually wrap its return value with Some:
-            Some(filename) // returns Option<String>
-        })
-        // Transform to Result<String> and finally to String with `?`:
+    let output_file = input_path.file_name().and_then(OsStr::to_str)
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?;
+     // Change extension if necessary:
+    let mut output_file = if let Some(to_ext) = convert {
+        let v: Vec<&str> = output_file.rsplitn(2, '.').collect(); // split in 2 on '.' starting from end
+        v[1].to_owned() + "." + to_ext
+    } else { output_file.to_owned() };
     output_file = smart_name(&output_file, seconds)?;
 
     // Create full path for output file:
