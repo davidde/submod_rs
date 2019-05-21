@@ -5,7 +5,7 @@ use regex::Regex;
 use failure::Error;
 
 
-pub fn get_paths<'a>(input: &'a str, seconds: f64, convert: Option<&str>)
+pub fn get_paths<'a>(input: &'a str, seconds: f64, convert_opt: Option<&str>)
     -> Result<(&'a Path, PathBuf), Error>
 {
     // Create full path for inputfile:
@@ -21,11 +21,11 @@ pub fn get_paths<'a>(input: &'a str, seconds: f64, convert: Option<&str>)
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"))?
         .to_owned();
     // Change extension if necessary:
-    if let Some(to_ext) = convert {
+    if let Some(to_ext) = convert_opt {
         output_file = output_file.rsplitn(2, '.') // split in 2 on '.' starting from the end
             .nth(1) // take out second &str from iterator: file name without extension
             .unwrap() // is safe because extension is guaranteed by is_srt_or_vtt validator
-            .to_owned() + "." + to_ext // add new extension and return as String.
+            .to_owned() + "." + to_ext; // add new extension and return as String.
     }
     // Create smart output name, different from input:
     output_file = smart_name(&output_file, seconds)?;
