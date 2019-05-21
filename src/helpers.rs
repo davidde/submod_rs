@@ -92,6 +92,8 @@ pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
 }
 
 pub fn is_float(seconds: String) -> Result<(), String> {
+    // Ideally, we should be able to return the f64 in Ok variant,
+    // but this most likely requires more advanced `dyn` or `impl` returns
     if let Ok(_) = seconds.parse::<f64>() {
         Ok(())
     } else {

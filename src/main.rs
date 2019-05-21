@@ -25,13 +25,6 @@ fn main() {
             .required(true)
             .index(2)
             .validator(helpers::is_float))
-        .arg(Arg::with_name("convert")
-            .help("Converts to other subtitle formats")
-            .short("c")
-            .long("convert")
-            .value_name("extension")
-            .takes_value(true)
-            .possible_values(&["srt", "vtt"]))
         .arg(Arg::with_name("start")
             .help("Indicates at what time the modification will start")
             .short("s") // By default, start is at the beginning of the file
@@ -52,7 +45,18 @@ fn main() {
             .long("output")
             .value_name("filename")
             .takes_value(true)
-            .validator(helpers::is_srt_or_vtt));
+            // The filename extension of `--output` takes precedence over --srt and --vtt,
+            // so we don't allow combining them:
+            .conflicts_with_all(&["srt", "vtt"])
+            // (Ideally, we should be able to notify the user with added error message!)
+            .validator(helpers::is_srt_or_vtt))
+        .arg(Arg::with_name("srt")
+            .help("Convert to srt format")
+            .long("srt")
+            .conflicts_with("vtt"))
+        .arg(Arg::with_name("vtt")
+            .help("Convert to vtt format")
+            .long("vtt"));
     let matches = app.get_matches();
 
     // Calling .unwrap() on "INPUT" and "SECONDS" is safe because both are required arguments.
@@ -61,7 +65,13 @@ fn main() {
     let seconds: f64 = matches.value_of("seconds").unwrap().parse().unwrap();
     // The second unwrap call on parse() is also safe because we've already
     // validated SECONDS as a float during argument parsing (using helpers::is_float)
-    let convert_opt = matches.value_of("convert");
+    let mut convert_opt = None;
+    if matches.is_present("srt") {
+        convert_opt = Some("srt");
+    }
+    if matches.is_present("vtt") {
+        convert_opt = Some("vtt");
+    }
     // Convert begin/stop Option<&str>s to Option<f64>s:
     let (mut start_opt, mut stop_opt, mut partial) = (None, None, false);
     if let Some(time_string) = matches.value_of("start") {
