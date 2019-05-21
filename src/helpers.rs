@@ -5,11 +5,17 @@ use regex::Regex;
 use failure::Error;
 
 
-pub fn get_paths<'a>(input: &'a str, seconds: f64, convert_opt: Option<&str>, partial: bool)
+pub fn get_paths<'a>(input: &'a str, seconds: f64, convert_opt: Option<&str>,
+        partial: bool, output: Option<&str>)
     -> Result<(&'a Path, PathBuf), Error>
 {
     // Create full path for inputfile:
     let input_path = Path::new(input); // creates Path that references input!
+
+    if let Some(file) = output {
+        let output_path = Path::new(file).to_owned();
+        return Ok( (input_path, output_path) );
+    }
 
     // Find parent: path without filename
     // => parent will be empty if the path consists of the filename alone

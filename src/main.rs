@@ -45,7 +45,14 @@ fn main() {
             .long("stop")
             .value_name("hh:mm:ss")
             .takes_value(true)
-            .validator(helpers::is_timing));
+            .validator(helpers::is_timing))
+        .arg(Arg::with_name("output")
+            .help("Filename or path where the modified file should be stored")
+            .short("o")
+            .long("output")
+            .value_name("filename")
+            .takes_value(true)
+            .validator(helpers::is_srt_or_vtt));
     let matches = app.get_matches();
 
     // Calling .unwrap() on "INPUT" and "SECONDS" is safe because both are required arguments.
@@ -65,8 +72,9 @@ fn main() {
         stop_opt = Some(submod::get_secs(time_string));
         partial = true;
     }
+    let output = matches.value_of("output");
 
-    let (input_path, output_path) = match helpers::get_paths(input, seconds, convert_opt, partial) {
+    let (input_path, output_path) = match helpers::get_paths(input, seconds, convert_opt, partial, output) {
         Ok(paths) => paths,
         Err(error) => {
             helpers::report_error(error);
