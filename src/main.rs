@@ -56,15 +56,17 @@ fn main() {
     // validated SECONDS as a float during argument parsing (using helpers::is_float)
     let convert_opt = matches.value_of("convert");
     // Convert begin/stop Option<&str>s to Option<f64>s:
-    let (mut start_opt, mut stop_opt) = (None, None);
-    if let Some(time_string) = matches.value_of("begin") {
+    let (mut start_opt, mut stop_opt, mut partial) = (None, None, false);
+    if let Some(time_string) = matches.value_of("start") {
         start_opt = Some(submod::get_secs(time_string));
+        partial = true; // Indicate partial modification
     }
     if let Some(time_string) = matches.value_of("stop") {
         stop_opt = Some(submod::get_secs(time_string));
+        partial = true;
     }
 
-    let (input_path, output_path) = match helpers::get_paths(input, seconds, convert_opt) {
+    let (input_path, output_path) = match helpers::get_paths(input, seconds, convert_opt, partial) {
         Ok(paths) => paths,
         Err(error) => {
             helpers::report_error(error);
