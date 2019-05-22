@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -7,15 +7,15 @@ use regex::Regex;
 use failure::Error;
 
 
-pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64,
-        start_opt: Option<f64>, stop_opt: Option<f64>)
+pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwrite: bool,
+        start_opt: Option<f64>, stop_opt: Option<f64>, copy_opt: &Option<PathBuf>)
     -> Result<i32, Error>
 {
-    let f = File::open(input_path)?;
+    let f = fs::File::open(input_path)?;
     let reader = BufReader::new(f);
     let timing = Regex::new(r"(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})$")?;
 
-    let mut out = File::create(output_path)?;
+    let mut out = fs::File::create(output_path)?;
     let mut skip: bool = false;
     let mut deleted_subs = 0;
 
@@ -53,6 +53,13 @@ pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64,
 
         // Add \n to the lines before writing them:
         out.write((new_line + "\n").as_bytes())?;
+    }
+
+    if let Some(original) = copy_opt {
+        fs::rename(input_path, original)?;
+    }
+    if overwrite {
+        fs::rename(output_path, input_path)?;
     }
 
     return Ok(deleted_subs);

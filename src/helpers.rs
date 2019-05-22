@@ -5,16 +5,16 @@ use regex::Regex;
 use failure::Error;
 
 
-pub fn get_paths<'a>(input: &'a str, seconds: f64, convert_opt: Option<&str>,
-        partial: bool, output: Option<&str>)
-    -> Result<(&'a Path, PathBuf), Error>
+pub fn get_paths<'a>(input: &'a str, seconds: f64, partial: bool,
+        output_opt: Option<&str>, convert_opt: Option<&str>, copy_opt: Option<()>)
+    -> Result<(&'a Path, PathBuf, Option<PathBuf>), Error>
 {
     // Create full path for inputfile:
     let input_path = Path::new(input); // creates Path that references input!
 
-    if let Some(file) = output {
+    if let Some(file) = output_opt {
         let output_path = Path::new(file).to_owned();
-        return Ok( (input_path, output_path) );
+        return Ok( (input_path, output_path, None) );
     }
 
     // Find parent: path without filename
@@ -39,7 +39,18 @@ pub fn get_paths<'a>(input: &'a str, seconds: f64, convert_opt: Option<&str>,
     // Create full path for output file:
     let output_path = parent.join(output_file); // creates owned PathBuf!
 
-    return Ok( (input_path, output_path) );
+    let mut path_opt = None;
+    if let Some(_) = copy_opt {
+        let original = input_path.file_stem()
+            .and_then(OsStr::to_str).unwrap()
+            .to_owned() + "__[Original]." +
+            input_path.extension()
+            .and_then(OsStr::to_str).unwrap();
+        let original_path = parent.join(original); // creates owned PathBuf!
+        path_opt = Some(original_path);
+    }
+
+    return Ok( (input_path, output_path, path_opt) );
 }
 
 /// This functions smartly formats the default output file name,
@@ -125,7 +136,7 @@ pub fn report_error(error: Error) {
                     For more information try \u{001b}[32m--help\u{001b}[0m");
 }
 
-pub fn report_success(deleted_subs: i32, output_path: &PathBuf) {
+pub fn report_success(deleted_subs: i32, output_path: &Path, overwrite: bool, copy_opt: Option<PathBuf>) {
     println!("\u{001b}[32;1mSuccess.\u{001b}[0m");
 
     if deleted_subs > 0 {
@@ -137,5 +148,10 @@ pub fn report_success(deleted_subs: i32, output_path: &PathBuf) {
         }
     }
 
+    if let Some(copy) = copy_opt {
+        println!(" The input file was renamed to {}", copy.display());
+    } else if overwrite {
+        println!(" The input file was overwritten.");
+    }
     println!(" Output: \u{001b}[1m \u{001b}[48;5;238m {} \u{001b}[0m", output_path.display());
 }
