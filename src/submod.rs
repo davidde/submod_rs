@@ -68,8 +68,8 @@ fn process_line(time_line: String, seconds: f64, timing: &Regex,
         let start_str = caps.get(1).unwrap().as_str();
         let end_str = caps.get(2).map_or("", |m| m.as_str());
 
-        line_start = get_secs(start_str) + seconds;
-        line_end = get_secs(end_str) + seconds;
+        line_start = get_secs(start_str);
+        line_end = get_secs(end_str);
     }
 
     if let Some(start_transform) = start_opt {
@@ -83,8 +83,8 @@ fn process_line(time_line: String, seconds: f64, timing: &Regex,
         }
     }
 
-    let start_string = build_time_string(line_start);
-    let end_string = build_time_string(line_end);
+    let start_string = build_time_string(line_start + seconds);
+    let end_string = build_time_string(line_end + seconds);
 
     if end_string == "(DELETED)\n" {
         end_string
