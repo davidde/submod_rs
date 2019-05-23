@@ -103,17 +103,17 @@ fn main() {
         convert_opt = Some("vtt");
     }
 
-    let (mut overwrite, mut copy_opt) = (false, None);
+    let (mut overwrite, mut copy) = (false, false);
     if matches.is_present("overwrite") {
         overwrite = true;
-        copy_opt = Some(());
+        copy = true;
     }
     if matches.is_present("destroy") {
         overwrite = true;
     }
 
-    let (input_path, output_path, copy_opt) = match helpers::get_paths(input, seconds, partial,
-        output_opt, convert_opt, copy_opt) {
+    let (input_path, output_path, copy_opt) = match helpers::get_paths(input, seconds,
+        partial, copy, output_opt, convert_opt) {
             Ok(paths) => paths,
             Err(error) => {
                 helpers::report_error(error);
@@ -123,7 +123,7 @@ fn main() {
 
     // Transform the file and return the number of deleted subtitles, if any:
     let deleted_subs = match submod::transform(input_path, &output_path, seconds,
-        overwrite, start_opt, stop_opt, &copy_opt) {
+        overwrite, &copy_opt, start_opt, stop_opt) {
             Ok(num) => num,
             Err(error) => {
                 helpers::report_error(error);

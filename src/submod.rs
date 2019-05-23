@@ -8,7 +8,7 @@ use failure::Error;
 
 
 pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwrite: bool,
-        start_opt: Option<f64>, stop_opt: Option<f64>, copy_opt: &Option<PathBuf>)
+        copy_opt: &Option<PathBuf>, start_opt: Option<f64>, stop_opt: Option<f64>)
     -> Result<i32, Error>
 {
     let f = fs::File::open(input_path)?;
@@ -20,37 +20,28 @@ pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwri
     let mut deleted_subs = 0;
 
     for line in reader.lines() {
-        let old_line = line?;
-        let is_timeline: bool = timing.is_match(&old_line);
-        let mut new_line;
+        let mut new_line = line?;
+        let is_timeline: bool = timing.is_match(&new_line);
 
         if is_timeline {
-            let time_line = old_line.replace(",", ".");
-            new_line = process_line(&time_line, seconds, &timing, start_opt, stop_opt);
+            new_line = new_line.replace(",", ".");
+            new_line = process_line(new_line, seconds, &timing, start_opt, stop_opt);
 
             if new_line == "(DELETED)\n" {
                 deleted_subs += 1;
-                skip = true;
+                skip = true; // skip/delete upcoming subtitles
             } else if output_path.extension().unwrap() == "srt" {
                 // Convert back to '.srt' style:
                 new_line = new_line.replace(".", ",");
             }
-        } else {
-            // When skip = True, subtitles are shifted too far back
-            // into the past (before the start of the movie),
-            // so they are deleted:
-            if skip {
-                // Subtitles can be 1 or 2 lines; we should only update
-                // skip when we have arrived at an empty line:
-                if old_line == "" {
-                    skip = false;
-                }
-                continue;
-            } else {
-                new_line = old_line;
+        } else if skip {
+            // Subtitles can be 1 or 2 lines;
+            // only reset skip if we have arrived at an empty line:
+            if new_line == "" {
+                skip = false;
             }
-        };
-
+            continue;
+        }
         // Add \n to the lines before writing them:
         out.write((new_line + "\n").as_bytes())?;
     }
@@ -65,44 +56,43 @@ pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwri
     return Ok(deleted_subs);
 }
 
-fn process_line(time_line: &str, seconds: f64, timing: &Regex,
-        start_opt: Option<f64>, stop_opt: Option<f64>)
-    -> String
+fn process_line(time_line: String, seconds: f64, timing: &Regex,
+    start_opt: Option<f64>, stop_opt: Option<f64>) -> String
 {
-    // Return the capture groups corresponding to the leftmost first match:
-    let caps = timing.captures(time_line).unwrap();
-    // Extract line start and end time as &str, notice 2 ways of doing this:
-    let start_str = caps.get(1).unwrap().as_str();
-    let end_str = caps.get(2).map_or("", |m| m.as_str());
+    let (line_start, line_end): (f64, f64);
+    // Create block so &time_line borrow by `captures` ends before return:
+    {
+        // Return the capture groups corresponding to the leftmost first match:
+        let caps = timing.captures(&time_line).unwrap();
+        // Extract line start and end time as &str, notice 2 ways of doing this:
+        let start_str = caps.get(1).unwrap().as_str();
+        let end_str = caps.get(2).map_or("", |m| m.as_str());
 
-    let line_start = get_secs(start_str);
-    let line_end = get_secs(end_str);
+        line_start = get_secs(start_str) + seconds;
+        line_end = get_secs(end_str) + seconds;
+    }
 
     if let Some(start_transform) = start_opt {
         if line_end < start_transform {
-            return time_line.to_string();
+            return time_line;
         }
     }
     if let Some(stop_transform) = stop_opt {
         if line_start > stop_transform {
-            return time_line.to_string();
+            return time_line;
         }
     }
 
-    let start_string = build_time_string(line_start, seconds);
-    let end_string = build_time_string(line_end, seconds);
+    let start_string = build_time_string(line_start);
+    let end_string = build_time_string(line_end);
 
-    let line = if start_string == "(DELETED)\n" {
-        if end_string == "(DELETED)\n" {
-            end_string
-        } else {
-            format!("00:00:00.000 --> {}", end_string)
-        }
+    if end_string == "(DELETED)\n" {
+        end_string
+    } else if start_string == "(DELETED)\n" {
+        format!("00:00:00.000 --> {}", end_string)
     } else {
         format!("{} --> {}", start_string, end_string)
-    };
-
-    return line;
+    }
 }
 
 /// Processes a &str of the form 'hh:mm:ss.sss'
@@ -115,20 +105,15 @@ pub fn get_secs(time_string: &str) -> f64 {
         .sum()
 }
 
-fn build_time_string(seconds: f64, incr: f64) -> String {
-    // incr can be negative, so the new time could be too:
-    let new_time = seconds + incr;
-
-    let time_string = if new_time >= 0.0 {
-        let hours = new_time as u64 / 3600;
-        let mins = (new_time as u64 % 3600) / 60;
-        let secs = new_time % 60.0;
+fn build_time_string(seconds: f64) -> String {
+    if seconds >= 0.0 {
+        let hours = seconds as u64 / 3600;
+        let mins = (seconds as u64 % 3600) / 60;
+        let secs = seconds % 60.0;
         format!("{0:02}:{1:02}:{2:06.3}", hours, mins, secs)
     } else {
         // the subtitles are now scheduled before the start
         // of the movie, so we can delete them:
         String::from("(DELETED)\n")
-    };
-
-    return time_string;
+    }
 }
