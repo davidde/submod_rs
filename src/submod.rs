@@ -7,8 +7,8 @@ use regex::Regex;
 use failure::Error;
 
 
-pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwrite: bool,
-        copy_opt: &Option<PathBuf>, start_opt: Option<f64>, stop_opt: Option<f64>)
+pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwrite: &mut bool,
+        rename_opt: &mut Option<PathBuf>, start_opt: Option<f64>, stop_opt: Option<f64>)
     -> Result<i32, Error>
 {
     let f = fs::File::open(input_path)?;
@@ -46,11 +46,19 @@ pub fn transform(input_path: &Path, output_path: &PathBuf, seconds: f64, overwri
         out.write((new_line + "\n").as_bytes())?;
     }
 
-    if let Some(original) = copy_opt {
-        fs::rename(input_path, original)?;
+    if let Some(original) = rename_opt.clone() {
+        if original.exists() {
+            *rename_opt = None;
+        } else {
+            fs::rename(input_path, original)?;
+        }
     }
-    if overwrite {
-        fs::rename(output_path, input_path)?;
+    if *overwrite {
+        if input_path.to_str().unwrap().contains("__[Original].") {
+            *overwrite = false;
+        } else {
+            fs::rename(output_path, input_path)?;
+        }
     }
 
     return Ok(deleted_subs);
