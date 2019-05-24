@@ -54,7 +54,7 @@ fn main() {
             .help("Overwrite input file, destroying the original")
             .short("o")
             .long("overwrite")
-            .conflicts_with_all(&["overname", "srt", "vtt"])
+            .conflicts_with("overname")
             .display_order(1))
         .arg(Arg::with_name("overname")
             .help("Overwrite input file, renaming the original\n\
@@ -62,7 +62,6 @@ fn main() {
                 will NOT rename the input since this would overwrite the 'original' input)")
             .short("O")
             .long("overname")
-            .conflicts_with_all(&["srt", "vtt"])
             .display_order(2))
         .arg(Arg::with_name("srt")
             .help("Convert to srt format")
@@ -112,7 +111,7 @@ fn main() {
         convert_opt = Some("srt");
     }
 
-    let (input_path, output_path, mut rename_opt) = match helpers::get_paths(input, seconds,
+    let (mut input_path, mut output_path, mut rename_opt) = match helpers::get_paths(input, seconds,
         partial, rename, output_opt, convert_opt) {
             Ok(paths) => paths,
             Err(error) => {
@@ -122,8 +121,8 @@ fn main() {
     };
 
     // Transform the file and return the number of deleted subtitles, if any:
-    let deleted_subs = match submod::transform(input_path, &output_path, seconds,
-        &mut overwrite, &mut rename_opt, start_opt, stop_opt) {
+    let deleted_subs = match submod::transform(&input_path, &output_path, seconds,
+        start_opt, stop_opt) {
             Ok(num) => num,
             Err(error) => {
                 helpers::report_error(error);
@@ -132,8 +131,12 @@ fn main() {
     };
 
     if overwrite {
-        helpers::report_success(deleted_subs, input_path, overwrite, rename_opt);
-    } else {
-        helpers::report_success(deleted_subs, &output_path, overwrite, rename_opt);
+        let overwritten = helpers::do_overwrites(&mut input_path, &mut output_path, &mut overwrite, &mut rename_opt);
+        if let Err(error) = overwritten {
+            helpers::report_error(error);
+            return;
+        }
     }
+
+    helpers::report_success(deleted_subs, &output_path, overwrite, rename_opt);
 }

@@ -1,21 +1,22 @@
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
+use std::fs;
 
 use regex::Regex;
 use failure::Error;
 
 
-pub fn get_paths<'a>(input: &'a str, seconds: f64, partial: bool, rename: bool,
+pub fn get_paths(input: &str, seconds: f64, partial: bool, rename: bool,
         output_opt: Option<&str>, convert_opt: Option<&str>)
-    -> Result<(&'a Path, PathBuf, Option<PathBuf>), Error>
+    -> Result<(PathBuf, PathBuf, Option<PathBuf>), Error>
 {
     // Create full path for inputfile:
-    let input_path = Path::new(input); // creates Path that references input!
+    let input_path = Path::new(input); // creates owned PathBuf
 
     // Return output early when user specified it with `--out` flag:
     if let Some(file) = output_opt {
-        let output_path = Path::new(file).to_owned();
-        return Ok( (input_path, output_path, None) );
+        let output_path = PathBuf::from(file);
+        return Ok( (input_path.to_owned(), output_path, None) );
     }
 
     // Find parent: path without filename
@@ -24,19 +25,19 @@ pub fn get_paths<'a>(input: &'a str, seconds: f64, partial: bool, rename: bool,
         .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
 
     // Create output file name and full path:
-    let output_name = smart_name(input_path, seconds, partial, convert_opt)?;
-    let output_path = parent.join(output_name); // creates owned PathBuf!
+    let output_name = smart_name(&input_path, seconds, partial, convert_opt)?;
+    let output_path = parent.join(output_name); // creates owned PathBuf
 
     // Create an optional rename in case user specified `--overname` flag:
     let mut rename_opt = None;
     if rename {
-        rename_opt = smart_rename(input_path);
+        rename_opt = smart_rename(&input_path);
         if rename_opt == None {
             return Err(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"));
         }
     }
 
-    return Ok( (input_path, output_path, rename_opt) );
+    return Ok( (input_path.to_owned(), output_path, rename_opt) );
 }
 
 /// This functions smartly formats the default output file name,
@@ -91,6 +92,35 @@ fn smart_rename(input_path: &Path) -> Option<PathBuf> {
         let original_path = input_path.parent()?.join(original); // creates owned PathBuf!
         Some(original_path)
     }
+}
+
+pub fn do_overwrites(input_path: &mut PathBuf, output_path: &mut PathBuf, overwrite: &mut bool,
+        rename_opt: &mut Option<PathBuf>)
+    -> Result<(), Error>
+{
+    // First rename input file to 'original' if necessary:
+    if let Some(original) = rename_opt.clone() {
+        if original.exists() {
+            *rename_opt = None;
+        } else {
+            fs::rename(&input_path, original)?;
+        }
+    }
+
+    // Then overwrite input file with output file:
+    if input_path.to_str().unwrap().contains("__[Original].") {
+        *overwrite = false;
+    } else {
+        if input_path.extension() != output_path.extension() {
+            // Modify input file extension if it doesn't match output file:
+            *input_path = input_path.with_extension(output_path.extension().unwrap());
+        }
+        fs::rename(&output_path, &input_path)?;
+        // Rename output_path so it is reported correctly to user:
+        *output_path = input_path.to_owned();
+    }
+
+    return Ok(());
 }
 
 pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
