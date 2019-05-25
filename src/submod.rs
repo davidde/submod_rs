@@ -25,7 +25,7 @@ pub fn transform(input_path: &Path, output_path: &Path, seconds: f64,
 
         if is_timeline {
             new_line = new_line.replace(",", ".");
-            new_line = process_line(new_line, seconds, &timing, start_opt, stop_opt);
+            new_line = process_line(new_line, seconds, start_opt, stop_opt);
 
             if new_line == "(DELETED)\n" {
                 deleted_subs += 1;
@@ -49,17 +49,14 @@ pub fn transform(input_path: &Path, output_path: &Path, seconds: f64,
     return Ok(deleted_subs);
 }
 
-fn process_line(time_line: String, seconds: f64, timing: &Regex,
+fn process_line(time_line: String, seconds: f64,
     start_opt: Option<f64>, stop_opt: Option<f64>) -> String
 {
     let (line_start, line_end): (f64, f64);
-    // Create block so &time_line borrow by `captures` ends before return:
+    // Create block so &time_line borrow ends before return:
     {
-        // Return the capture groups corresponding to the leftmost first match:
-        let caps = timing.captures(&time_line).unwrap();
-        // Extract line start and end time as &str, notice 2 ways of doing this:
-        let start_str = caps.get(1).unwrap().as_str();
-        let end_str = caps.get(2).map_or("", |m| m.as_str());
+        let start_str = &time_line[0..12];
+        let end_str = &time_line[17..29];
 
         line_start = get_secs(start_str);
         line_end = get_secs(end_str);
