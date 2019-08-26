@@ -22,7 +22,8 @@ pub fn get_paths(input: &str, seconds: f64, partial: bool, rename: bool,
     // Find parent: path without filename
     // => parent will be empty if the path consists of the filename alone
     let parent = input_path.parent()
-        .ok_or(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
+        .ok_or(format_err!("Invalid value for \
+            '\u{001b}[33m<INPUT>\u{001b}[0m': incorrect path"))?;
 
     // Create output file name and full path:
     let output_name = smart_name(&input_path, seconds, partial, convert_opt)?;
@@ -33,7 +34,8 @@ pub fn get_paths(input: &str, seconds: f64, partial: bool, rename: bool,
     if rename {
         rename_opt = smart_rename(&input_path);
         if rename_opt == None {
-            return Err(format_err!("Invalid value for '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"));
+            return Err(format_err!("Invalid value for \
+                '\u{001b}[33m<INPUT>\u{001b}[0m': invalid file name"));
         }
     }
 
@@ -61,11 +63,17 @@ fn smart_name(input_path: &Path, mut seconds: f64, partial: bool,
     let was_processed: bool = tag.is_match(stem);
 
     if was_processed {
-        // Extract the increment number from the filename, and add it to seconds:
-        seconds += Regex::new(r"[+-]\d+\.\d+")? // regex for finding number in filename
-            .captures(stem).unwrap() // unwrap capture groups corresponding to the leftmost match
-            .get(0).unwrap() // take out entire match and unwrap from Option
-            .as_str().parse::<f64>()?; // convert to str and then to float
+        // Extract the increment number from the filename,
+        // and add it to seconds:
+        seconds +=
+            // regex for finding number in filename:
+            Regex::new(r"[+-]\d+\.\d+")?
+            // unwrap capture groups corresponding to the leftmost match:
+            .captures(stem).unwrap()
+            // take out entire match and unwrap from Option:
+            .get(0).unwrap()
+            // convert to str and then to float:
+            .as_str().parse::<f64>()?;
 
         let tag_start = tag.find(stem).unwrap().start();
         stem = &stem[..tag_start];
@@ -89,13 +97,14 @@ fn smart_rename(input_path: &Path) -> Option<PathBuf> {
             .to_owned() + "__[Original]." +
                 input_path.extension()
                 .and_then(OsStr::to_str)?;
-        let original_path = input_path.parent()?.join(original); // creates owned PathBuf!
+        // create owned PathBuf:
+        let original_path = input_path.parent()?.join(original);
         Some(original_path)
     }
 }
 
-pub fn do_overwrites(input_path: &mut PathBuf, output_path: &mut PathBuf, overwrite: &mut bool,
-        rename_opt: &mut Option<PathBuf>)
+pub fn do_overwrites(input_path: &mut PathBuf, output_path: &mut PathBuf,
+        overwrite: &mut bool, rename_opt: &mut Option<PathBuf>)
     -> Result<(), Error>
 {
     // First rename input file to 'original' if necessary:
@@ -113,7 +122,8 @@ pub fn do_overwrites(input_path: &mut PathBuf, output_path: &mut PathBuf, overwr
     } else {
         if input_path.extension() != output_path.extension() {
             // Modify input file extension if it doesn't match output file:
-            *input_path = input_path.with_extension(output_path.extension().unwrap());
+            *input_path = input_path.with_extension(
+                output_path.extension().unwrap());
         }
         fs::rename(&output_path, &input_path)?;
         // Rename output_path so it is reported correctly to user:
@@ -128,7 +138,8 @@ pub fn is_srt_or_vtt(input: String) -> Result<(), String> {
         return Ok(());
     }
     Err(String::from("incorrect file extension\n\n\
-        Only \u{001b}[32m.srt\u{001b}[0m or \u{001b}[32m.vtt\u{001b}[0m files are allowed."))
+        Only \u{001b}[32m.srt\u{001b}[0m or \u{001b}[32m.vtt\u{001b}[0m \
+        files are allowed."))
 }
 
 pub fn is_float(seconds: String) -> Result<(), String> {
@@ -144,14 +155,18 @@ pub fn is_float(seconds: String) -> Result<(), String> {
 pub fn is_timing(time_string: String) -> Result<(), String> {
     let result: Result<Vec<_>, _> = time_string.rsplit(":")
         .map(|t| t.parse::<f64>())
-        .collect(); // use collect() on iterator of Result<T, E>s to see if any of them failed!
+        // use collect() on iterator of Result<T, E>s,
+        // to see if any of them failed:
+        .collect();
 
     match result {
         Ok(_) => Ok(()),
         Err(_) => Err(String::from("incorrect time formatting\n\n\
             Use ':' to separate hours, minutes and seconds, like so:\n    \
-            \u{001b}[32mhh:mm:ss\u{001b}[0m to specify hours, minutes and seconds\n       \
-            \u{001b}[32mmm:ss\u{001b}[0m to only specify minutes and seconds\n          \
+            \u{001b}[32mhh:mm:ss\u{001b}[0m to specify \
+            hours, minutes and seconds\n       \
+            \u{001b}[32mmm:ss\u{001b}[0m to only specify \
+            minutes and seconds\n          \
             \u{001b}[32mss\u{001b}[0m to only specify seconds"))
     }
 }
@@ -160,19 +175,26 @@ pub fn report_error(error: Error) {
     eprintln!("\u{001b}[38;5;208mError:\u{001b}[0m {}\n", error);
     println!("USAGE:\n    \
                 submod [FLAGS] [OPTIONS] <filename> <seconds>\n        \
-                    <filename>   (Path to) .srt or .vtt subtitle file to modify\n        \
-                    <seconds>    seconds to add or subtract from time encoding\n\n\
-                    For more information try \u{001b}[32msubmod --help\u{001b}[0m");
+                    <filename>   (Path to) .srt or .vtt subtitle file \
+                    to modify\n        \
+                    <seconds>    seconds to add or subtract \
+                    from time encoding\n\n\
+                    For more information try \
+                    \u{001b}[32msubmod --help\u{001b}[0m");
 }
 
-pub fn report_success(deleted_subs: i32, output_path: &Path, overwrite: bool, rename_opt: Option<PathBuf>) {
+pub fn report_success(deleted_subs: i32, output_path: &Path,
+    overwrite: bool, rename_opt: Option<PathBuf>)
+{
     println!("\u{001b}[32;1mSuccess.\u{001b}[0m");
 
     if deleted_subs > 0 {
         if deleted_subs == 1 {
-            println!("    \u{001b}[41;1m ! \u{001b}[0m   One subtitle was deleted at the beginning of the file.");
+            println!("    \u{001b}[41;1m ! \u{001b}[0m   \
+                One subtitle was deleted at the beginning of the file.");
         } else {
-            println!("    \u{001b}[41;1m ! \u{001b}[0m   {} subtitles were deleted at the beginning of the file.",
+            println!("    \u{001b}[41;1m ! \u{001b}[0m   \
+                {} subtitles were deleted at the beginning of the file.",
                 deleted_subs);
         }
     }
@@ -182,5 +204,6 @@ pub fn report_success(deleted_subs: i32, output_path: &Path, overwrite: bool, re
         println!(" The input file was overwritten.");
     }
 
-    println!(" Output: \u{001b}[1m \u{001b}[48;5;238m {} \u{001b}[0m", output_path.display());
+    println!(" Output: \u{001b}[1m \u{001b}[48;5;238m {} \u{001b}[0m",
+        output_path.display());
 }

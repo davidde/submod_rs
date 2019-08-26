@@ -15,7 +15,8 @@ fn main() {
         // AllowLeadingHyphen allows passing negative seconds:
         .setting(AppSettings::AllowLeadingHyphen)
         .about("Modify the time encoding of .srt or .vtt subtitle files.\n\
-                By default, submod generates a new output file, not overwriting the input.")
+                By default, submod generates a new output file, \
+                without overwriting the input.")
         .arg(Arg::with_name("file")
             .help("File name or path to the subtitle file to modify")
             .required(true)
@@ -34,7 +35,11 @@ fn main() {
             .takes_value(true)
             .validator(helpers::is_timing))
         .arg(Arg::with_name("stop")
-            .help("Specify at what time the modification should stop")
+            .help("Specify at what time the modification should stop\n\
+                Use ':' to separate hours, minutes and seconds, like so:\n\
+                hh:mm:ss to specify hours, minutes and seconds\n   \
+                mm:ss to only specify minutes and seconds\n      \
+                ss to only specify seconds")
             .short("S") // By default, stop is at the end of the file
             .long("stop")
             .value_name("hh:mm:ss")
@@ -45,10 +50,11 @@ fn main() {
             .long("out")
             .value_name("filename")
             .takes_value(true)
-            // The filename extension of `--output` takes precedence over --srt and --vtt,
-            // so we don't allow combining them:
+            // The filename extension of `--output` takes precedence
+            // over --srt and --vtt, so we don't allow combining them:
             .conflicts_with_all(&["overwrite", "overname", "srt", "vtt"])
-            // (Ideally, we should be able to notify the user with added error message!)
+            // (Ideally, we should be able to notify the user
+            // with an added error message!)
             .validator(helpers::is_srt_or_vtt))
         .arg(Arg::with_name("overwrite")
             .help("Overwrite input file, destroying the original")
@@ -58,8 +64,10 @@ fn main() {
             .display_order(1))
         .arg(Arg::with_name("overname")
             .help("Overwrite input file, renaming the original\n\
-                (Only necessary on first call; consecutive `overnames` on same input\n\
-                will NOT rename the input since this would overwrite the 'original' input)")
+                    (Only necessary on first call; \
+                    consecutive `overnames` on same input\n\
+                    will NOT rename the input since this would \
+                    overwrite the 'original' input)")
             .short("O")
             .long("overname")
             .display_order(2))
@@ -74,12 +82,14 @@ fn main() {
             .display_order(4));
     let matches = app.get_matches();
 
-    // Calling .unwrap() on "INPUT" and "SECONDS" is safe because both are required arguments.
-    // (If they weren't required we could use an 'if let' to conditionally get the value)
+    // Calling .unwrap() on "INPUT" and "SECONDS" is safe,
+    // because both are required arguments. (If they weren't required,
+    // we could use an 'if let' to conditionally get the value)
     let input = matches.value_of("file").unwrap();
     let seconds: f64 = matches.value_of("seconds").unwrap().parse().unwrap();
     // The second unwrap call on parse() is also safe because we've already
-    // validated SECONDS as a float during argument parsing (using helpers::is_float)
+    // validated SECONDS as a float during argument parsing
+    // (using helpers::is_float)
 
     // Convert begin/stop Option<&str>s to Option<f64>s:
     let (mut start_opt, mut stop_opt, mut partial) = (None, None, false);
@@ -111,18 +121,19 @@ fn main() {
         convert_opt = Some("srt");
     }
 
-    let (mut input_path, mut output_path, mut rename_opt) = match helpers::get_paths(input, seconds,
-        partial, rename, output_opt, convert_opt) {
-            Ok(paths) => paths,
-            Err(error) => {
-                helpers::report_error(error);
-                return;
-            }
+    let (mut input_path, mut output_path, mut rename_opt) =
+        match helpers::get_paths(input, seconds, partial,
+            rename, output_opt, convert_opt) {
+                Ok(paths) => paths,
+                Err(error) => {
+                    helpers::report_error(error);
+                    return;
+                }
     };
 
     // Transform the file and return the number of deleted subtitles, if any:
-    let deleted_subs = match submod::transform(&input_path, &output_path, seconds,
-        start_opt, stop_opt) {
+    let deleted_subs = match submod::transform(&input_path, &output_path,
+        seconds, start_opt, stop_opt) {
             Ok(num) => num,
             Err(error) => {
                 helpers::report_error(error);
@@ -131,7 +142,8 @@ fn main() {
     };
 
     if overwrite {
-        let overwritten = helpers::do_overwrites(&mut input_path, &mut output_path, &mut overwrite, &mut rename_opt);
+        let overwritten = helpers::do_overwrites(&mut input_path,
+            &mut output_path, &mut overwrite, &mut rename_opt);
         if let Err(error) = overwritten {
             helpers::report_error(error);
             return;

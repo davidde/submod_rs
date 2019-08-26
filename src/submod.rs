@@ -13,7 +13,8 @@ pub fn transform(input_path: &Path, output_path: &Path, seconds: f64,
 {
     let f = fs::File::open(input_path)?;
     let reader = BufReader::new(f);
-    let timing = Regex::new(r"(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})$")?;
+    let timing = Regex::new(
+        r"(\d{2}:\d{2}:\d{2}[,.]\d{3}) --> (\d{2}:\d{2}:\d{2}[,.]\d{3})$")?;
 
     let mut out = fs::File::create(output_path)?;
     let mut skip: bool = false;
@@ -89,7 +90,8 @@ fn process_line(time_line: String, seconds: f64,
 /// into the total number of seconds as f64.
 pub fn get_secs(time_string: &str) -> f64 {
     time_string.rsplit(":")
-        .map(|t| t.parse::<f64>().unwrap()) // can't panic since time_string is validated by regex!
+        // can't panic since time_string is validated by regex:
+        .map(|t| t.parse::<f64>().unwrap())
         .zip(&[1.0, 60.0, 3600.0])
         .map(|(a, b)| a * b)
         .sum()
