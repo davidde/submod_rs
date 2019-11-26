@@ -4,7 +4,7 @@ These corrections are **permanent** modifications to the subtitle files.
 This means they are *not* lost when playback ends, unlike media player corrections.
 This can be really useful for niche movies/series that don't have many correct subtitles.
 
-Originally a rewrite of [submod_py](https://github.com/DavidDeprost/submod_py) to learn Rust,
+Originally a rewrite of [submod_py](https://github.com/davidde/submod_py) to learn Rust,
 it has since surpassed its Python ancestor in terms of features.
 
 ## Installation
@@ -13,7 +13,7 @@ it has since surpassed its Python ancestor in terms of features.
 
 * Then, it's a simple install with cargo:
     ```bash
-    git clone https://github.com/DavidDeprost/submod_rs.git
+    git clone https://github.com/davidde/submod_rs.git
     cargo install --path ./submod_rs
     ```
 
